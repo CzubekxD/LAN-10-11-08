@@ -1,1 +1,258 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lead Times – Scatterplot</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 0; padding: 24px;
+    background: #f7f8fa; color: #1a1a2e;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #667; font-size: 13px; margin: 0 0 20px; }
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 20px;
+    background: #fff; border: 1px solid #e2e5ea; border-radius: 10px;
+    padding: 16px 20px; margin-bottom: 18px;
+  }
+  .group { display: flex; flex-direction: column; gap: 6px; }
+  .group > label.title { font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: .5px; color: #556; }
+  .chips { display: flex; gap: 8px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 20px; cursor: pointer;
+    border: 1.5px solid #ccd; font-size: 13px; user-select: none;
+    background: #fff; transition: all .12s;
+  }
+  .chip.off { opacity: .35; }
+  .chip .dot { width: 11px; height: 11px; border-radius: 50%; }
+  .pctline { display: flex; align-items: center; gap: 7px; font-size: 13px; cursor: pointer; user-select: none; }
+  .pctline input { cursor: pointer; }
+  .rangebox { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .rangebox input { width: 70px; padding: 4px 6px; border: 1px solid #ccd; border-radius: 6px; font-size: 13px; }
+  .chartwrap { background: #fff; border: 1px solid #e2e5ea; border-radius: 10px; padding: 16px; }
+  svg { display: block; width: 100%; height: auto; }
+  .stats { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 14px; font-size: 13px; color: #445; }
+  .stats b { color: #1a1a2e; }
+  .tip {
+    position: fixed; pointer-events: none; background: #1a1a2e; color: #fff;
+    padding: 7px 10px; border-radius: 7px; font-size: 12px; opacity: 0;
+    transition: opacity .1s; z-index: 10; white-space: nowrap;
+  }
+  .dot-pt { cursor: pointer; transition: r .1s; }
+  .grid line { stroke: #eef0f3; }
+  .axis text { fill: #667; font-size: 11px; }
+  .axis path, .axis line.tick { stroke: #ccd; }
+  .pct-label { font-size: 11px; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>Lead Times 2024–25 — Scatterplot</h1>
+<p class="sub">36 zadań · oś X: data ukończenia · oś Y: czas realizacji (dni)</p>
 
+<div class="controls">
+  <div class="group">
+    <label class="title">Rozmiar</label>
+    <div class="chips" id="sizeChips">
+      <span class="chip" data-size="S"><span class="dot" style="background:#2563eb"></span>S</span>
+      <span class="chip" data-size="M"><span class="dot" style="background:#eab308"></span>M</span>
+      <span class="chip" data-size="L"><span class="dot" style="background:#dc2626"></span>L</span>
+    </div>
+  </div>
+  <div class="group">
+    <label class="title">Percentyle</label>
+    <div class="chips">
+      <label class="pctline"><input type="checkbox" data-pct="50" checked> P50</label>
+      <label class="pctline"><input type="checkbox" data-pct="85" checked> P85</label>
+      <label class="pctline"><input type="checkbox" data-pct="95" checked> P95</label>
+    </div>
+  </div>
+  <div class="group">
+    <label class="title">Średnie</label>
+    <div class="chips">
+      <label class="pctline"><input type="checkbox" data-mean="ALL" checked> Całość</label>
+      <label class="pctline"><input type="checkbox" data-mean="S"> S</label>
+      <label class="pctline"><input type="checkbox" data-mean="M"> M</label>
+      <label class="pctline"><input type="checkbox" data-mean="L"> L</label>
+    </div>
+  </div>
+  <div class="group">
+    <label class="title">Czas realizacji (dni)</label>
+    <div class="rangebox">
+      <input type="number" id="ltMin" placeholder="min">
+      <span>–</span>
+      <input type="number" id="ltMax" placeholder="max">
+    </div>
+  </div>
+</div>
+
+<div class="chartwrap">
+  <svg id="chart" viewBox="0 0 900 480"></svg>
+  <div class="stats" id="stats"></div>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<script>
+const DATA = [{"date":"2024-07-15","size":"S","lt":49},{"date":"2024-08-22","size":"S","lt":48},{"date":"2024-09-10","size":"S","lt":87},{"date":"2024-09-25","size":"M","lt":57},{"date":"2024-10-05","size":"M","lt":148},{"date":"2024-10-14","size":"S","lt":53},{"date":"2024-10-28","size":"S","lt":45},{"date":"2024-11-18","size":"M","lt":145},{"date":"2024-12-04","size":"L","lt":105},{"date":"2025-01-08","size":"S","lt":5},{"date":"2025-01-20","size":"L","lt":163},{"date":"2025-02-14","size":"S","lt":43},{"date":"2025-02-26","size":"M","lt":415},{"date":"2025-03-15","size":"L","lt":123},{"date":"2025-04-10","size":"M","lt":103},{"date":"2025-05-05","size":"L","lt":104},{"date":"2025-06-12","size":"L","lt":302},{"date":"2025-06-25","size":"L","lt":158},{"date":"2025-07-02","size":"L","lt":98},{"date":"2025-07-11","size":"S","lt":52},{"date":"2025-07-18","size":"M","lt":95},{"date":"2025-07-29","size":"S","lt":70},{"date":"2025-08-03","size":"M","lt":95},{"date":"2025-08-14","size":"M","lt":101},{"date":"2025-08-21","size":"M","lt":57},{"date":"2025-08-29","size":"M","lt":57},{"date":"2025-09-08","size":"S","lt":53},{"date":"2025-09-22","size":"L","lt":137},{"date":"2025-10-04","size":"S","lt":73},{"date":"2025-10-12","size":"M","lt":60},{"date":"2025-10-19","size":"S","lt":126},{"date":"2025-10-27","size":"M","lt":57},{"date":"2025-11-05","size":"L","lt":124},{"date":"2025-11-15","size":"M","lt":75},{"date":"2025-11-25","size":"M","lt":89},{"date":"2025-12-10","size":"S","lt":44}];
+
+const COLORS = {S:"#2563eb", M:"#eab308", L:"#dc2626"};
+DATA.forEach(d => d.t = new Date(d.date).getTime());
+
+const state = { sizes: new Set(["S","M","L"]), pct: {50:true,85:true,95:true}, mean: {ALL:true,S:false,M:false,L:false}, ltMin:null, ltMax:null };
+const avg = a => a.length ? a.reduce((s,v)=>s+v,0)/a.length : null;
+
+const W=900, H=480, m={t:24,r:20,b:44,l:52};
+const iw=W-m.l-m.r, ih=H-m.t-m.b;
+const svg=document.getElementById("chart");
+const tip=document.getElementById("tip");
+const NS="http://www.w3.org/2000/svg";
+const el=(n,a)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);return e;};
+
+// percentile (linear interpolation)
+function pctl(arr,p){
+  if(!arr.length) return null;
+  const s=[...arr].sort((a,b)=>a-b);
+  const idx=(p/100)*(s.length-1);
+  const lo=Math.floor(idx), hi=Math.ceil(idx);
+  if(lo===hi) return s[lo];
+  return s[lo]+(s[hi]-s[lo])*(idx-lo);
+}
+
+const tExtent=[Math.min(...DATA.map(d=>d.t)), Math.max(...DATA.map(d=>d.t))];
+const ltMaxAll=Math.max(...DATA.map(d=>d.lt));
+
+function xScale(t){ return m.l + (t-tExtent[0])/(tExtent[1]-tExtent[0])*iw; }
+function yScale(v,ymax){ return m.t + ih - v/ymax*ih; }
+
+function filtered(){
+  return DATA.filter(d=>{
+    if(!state.sizes.has(d.size)) return false;
+    if(state.ltMin!=null && d.lt<state.ltMin) return false;
+    if(state.ltMax!=null && d.lt>state.ltMax) return false;
+    return true;
+  });
+}
+
+function render(){
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+  const pts=filtered();
+  const yTop=Math.max(ltMaxAll,10);
+  const ymax=Math.ceil(yTop/50)*50;
+
+  // grid + y axis
+  const g=el("g",{class:"grid"});
+  const yticks=6;
+  for(let i=0;i<=yticks;i++){
+    const v=ymax/yticks*i, y=yScale(v,ymax);
+    g.appendChild(el("line",{x1:m.l,x2:W-m.r,y1:y,y2:y}));
+    const lab=el("text",{x:m.l-8,y:y+4,"text-anchor":"end",fill:"#667","font-size":11});
+    lab.textContent=Math.round(v); g.appendChild(lab);
+  }
+  svg.appendChild(g);
+
+  // x axis (monthly-ish ticks)
+  const ax=el("g",{class:"axis"});
+  const start=new Date(tExtent[0]), end=new Date(tExtent[1]);
+  let cur=new Date(start.getFullYear(),start.getMonth(),1);
+  while(cur.getTime()<=end.getTime()){
+    if(cur.getTime()>=tExtent[0]){
+      const x=xScale(cur.getTime());
+      const lab=el("text",{x:x,y:H-m.b+18,"text-anchor":"middle"});
+      lab.textContent=cur.toLocaleDateString("pl-PL",{month:"short",year:"2-digit"});
+      ax.appendChild(lab);
+      ax.appendChild(el("line",{class:"tick",x1:x,x2:x,y1:m.t+ih,y2:m.t+ih+4,stroke:"#ccd"}));
+    }
+    cur=new Date(cur.getFullYear(),cur.getMonth()+2,1);
+  }
+  ax.appendChild(el("text",{x:m.l-40,y:m.t-8,fill:"#556","font-size":11,"font-weight":"bold"}));
+  svg.appendChild(ax);
+
+  // axis titles
+  const yt=el("text",{x:16,y:m.t+ih/2,fill:"#556","font-size":12,"font-weight":"bold","text-anchor":"middle",transform:`rotate(-90 16 ${m.t+ih/2})`});
+  yt.textContent="Czas realizacji (dni)"; svg.appendChild(yt);
+
+  // percentile lines (based on currently filtered points)
+  const lts=pts.map(d=>d.lt);
+  const pctColors={50:"#16a34a",85:"#f97316",95:"#9333ea"};
+  [50,85,95].forEach(p=>{
+    if(!state.pct[p]) return;
+    const v=pctl(lts,p);
+    if(v==null) return;
+    const y=yScale(v,ymax);
+    svg.appendChild(el("line",{x1:m.l,x2:W-m.r,y1:y,y2:y,stroke:pctColors[p],"stroke-width":1.5,"stroke-dasharray":"6 4",opacity:.85}));
+    const lab=el("text",{x:W-m.r-4,y:y-5,"text-anchor":"end",class:"pct-label",fill:pctColors[p]});
+    lab.textContent=`P${p} = ${v.toFixed(0)} dni`;
+    svg.appendChild(lab);
+  });
+
+  // mean lines
+  const meanColors={ALL:"#1a1a2e",S:COLORS.S,M:COLORS.M,L:COLORS.L};
+  let mLabelSlot=0;
+  ["ALL","S","L","M"].forEach(key=>{
+    if(!state.mean[key]) return;
+    const subset = key==="ALL" ? lts : pts.filter(d=>d.size===key).map(d=>d.lt);
+    const v=avg(subset);
+    if(v==null) return;
+    const y=yScale(v,ymax);
+    svg.appendChild(el("line",{x1:m.l,x2:W-m.r,y1:y,y2:y,stroke:meanColors[key],"stroke-width":2,opacity:.9}));
+    const name = key==="ALL" ? "śr. całość" : "śr. "+key;
+    const lab=el("text",{x:m.l+4,y:y-5,"text-anchor":"start",class:"pct-label",fill:meanColors[key]});
+    lab.textContent=`${name} = ${v.toFixed(0)} dni`;
+    svg.appendChild(lab);
+  });
+
+  // points
+  pts.forEach(d=>{
+    const cx=xScale(d.t), cy=yScale(d.lt,ymax);
+    const c=el("circle",{class:"dot-pt",cx:cx,cy:cy,r:6,fill:COLORS[d.size],stroke:"#fff","stroke-width":1.5,"fill-opacity":.85});
+    c.addEventListener("mousemove",e=>{
+      tip.style.opacity=1;
+      tip.style.left=(e.clientX+12)+"px";
+      tip.style.top=(e.clientY-10)+"px";
+      tip.innerHTML=`<b>${d.size}</b> · ${new Date(d.t).toLocaleDateString("pl-PL")}<br>${d.lt} dni`;
+      c.setAttribute("r",8);
+    });
+    c.addEventListener("mouseleave",()=>{tip.style.opacity=0;c.setAttribute("r",6);});
+    svg.appendChild(c);
+  });
+
+  // stats
+  const st=document.getElementById("stats");
+  const p50=pctl(lts,50), p85=pctl(lts,85), p95=pctl(lts,95);
+  st.innerHTML = `<span><b>${pts.length}</b> / ${DATA.length} punktów</span>`+
+    (p50!=null?`<span>P50: <b>${p50.toFixed(0)}</b> dni</span><span>P85: <b>${p85.toFixed(0)}</b> dni</span><span>P95: <b>${p95.toFixed(0)}</b> dni</span>`:`<span>brak danych w filtrze</span>`);
+  if(lts.length){
+    const mAll=avg(lts);
+    const mS=avg(pts.filter(d=>d.size==="S").map(d=>d.lt));
+    const mM=avg(pts.filter(d=>d.size==="M").map(d=>d.lt));
+    const mL=avg(pts.filter(d=>d.size==="L").map(d=>d.lt));
+    const f=v=>v==null?"–":v.toFixed(0);
+    st.innerHTML += `<span>Śr. całość: <b>${f(mAll)}</b> dni</span><span>Śr. S: <b>${f(mS)}</b></span><span>Śr. M: <b>${f(mM)}</b></span><span>Śr. L: <b>${f(mL)}</b></span>`;
+  }
+}
+
+// controls
+document.getElementById("sizeChips").addEventListener("click",e=>{
+  const chip=e.target.closest(".chip"); if(!chip)return;
+  const s=chip.dataset.size;
+  if(state.sizes.has(s)){state.sizes.delete(s);chip.classList.add("off");}
+  else{state.sizes.add(s);chip.classList.remove("off");}
+  render();
+});
+document.querySelectorAll("[data-pct]").forEach(cb=>{
+  cb.addEventListener("change",()=>{state.pct[cb.dataset.pct]=cb.checked;render();});
+});
+document.querySelectorAll("[data-mean]").forEach(cb=>{
+  cb.addEventListener("change",()=>{state.mean[cb.dataset.mean]=cb.checked;render();});
+});
+document.getElementById("ltMin").addEventListener("input",e=>{state.ltMin=e.target.value===""?null:+e.target.value;render();});
+document.getElementById("ltMax").addEventListener("input",e=>{state.ltMax=e.target.value===""?null:+e.target.value;render();});
+
+render();
+</script>
+</body>
+</html>
