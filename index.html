@@ -54,6 +54,14 @@
   .axis path, .axis line.tick { stroke: #ccd; }
   .pct-label { font-size: 11px; font-weight: bold; }
 
+  .tabs { display:flex; gap:4px; margin-bottom:16px; border-bottom:2px solid #e2e5ea; }
+  .tab { padding:10px 20px; font-size:14px; font-weight:bold; cursor:pointer; color:#889;
+         border:none; background:none; border-bottom:3px solid transparent; margin-bottom:-2px; font-family:inherit; }
+  .tab.active { color:#1a1a2e; border-bottom-color:#1a1a2e; }
+  .panel { display:none; } .panel.active { display:block; }
+  .signal { fill:#dc2626; }
+  .chip.active-scope { background:#1a1a2e; color:#fff; border-color:#1a1a2e; }
+
   .side { display:flex; flex-direction:column; gap:14px; }
   .card { background:#fff; border:1px solid #e2e5ea; border-radius:10px; padding:14px 16px; }
   .card h3 { margin:0 0 10px; font-size:13px; text-transform:uppercase; letter-spacing:.5px; color:#556; }
@@ -77,8 +85,15 @@
 </style>
 </head>
 <body>
-<h1>Lead Times 2024–25 — Scatterplot</h1>
-<p class="sub">Oś X: data ukończenia · Oś Y: czas realizacji (dni) · Kliknij punkt, aby wykluczyć go z obliczeń</p>
+<h1>Lead Times 2024–25</h1>
+<p class="sub" id="subtitle">Oś X: data ukończenia · Oś Y: czas realizacji (dni) · Kliknij punkt, aby wykluczyć go z obliczeń</p>
+
+<div class="tabs">
+  <button class="tab active" data-tab="scatter">Scatterplot</button>
+  <button class="tab" data-tab="pbc">Process Behaviour Chart</button>
+</div>
+
+<div class="panel active" id="panel-scatter">
 
 <div class="controls">
   <div class="group">
@@ -179,6 +194,55 @@
         Obwódka = outlier wg reguły 1.5×IQR.
       </div>
     </div>
+  </div>
+</div>
+
+</div><!-- /panel-scatter -->
+
+<div class="panel" id="panel-pbc">
+  <div class="controls">
+    <div class="group">
+      <label class="title">Zbiór do analizy</label>
+      <div class="chips" id="pbcScope">
+        <span class="chip active-scope" data-scope="ALL">Całość</span>
+        <span class="chip" data-scope="S"><span class="dot" style="background:#2563eb"></span>S</span>
+        <span class="chip" data-scope="M"><span class="dot" style="background:#eab308"></span>M</span>
+        <span class="chip" data-scope="L"><span class="dot" style="background:#dc2626"></span>L</span>
+      </div>
+    </div>
+    <div class="group">
+      <label class="title">Czas realizacji (dni)</label>
+      <div class="rangebox">
+        <input type="number" id="pbcLtMin" placeholder="min">
+        <span>–</span>
+        <input type="number" id="pbcLtMax" placeholder="max">
+      </div>
+    </div>
+    <div class="group">
+      <label class="title">Zakres dat</label>
+      <div class="rangebox">
+        <input type="date" id="pbcDMin">
+        <span>–</span>
+        <input type="date" id="pbcDMax">
+      </div>
+    </div>
+    <div class="group">
+      <label class="title">Widok</label>
+      <div class="chips">
+        <label class="pctline"><input type="checkbox" id="pbcShowMR" checked> Pokaż wykres mR (dolny)</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="chartwrap">
+    <svg id="pbcChart" viewBox="0 0 900 360"></svg>
+    <svg id="mrChart" viewBox="0 0 900 220"></svg>
+    <div class="stats" id="pbcStats"></div>
+    <p class="legend" style="margin-top:10px">
+      CL = średnia (linia centralna). UNPL / LNPL = granice zmienności typowej = średnia ± 2,66 × średni ruchomy rozstęp (mR).
+      LNPL przycięte do 0, bo czas realizacji nie może być ujemny. Czerwone punkty = sygnały poza granicami (zmienność nietypowa).
+      Kliknij punkt na górnym wykresie, aby wykluczyć go z obliczeń.
+    </p>
   </div>
 </div>
 
@@ -364,7 +428,7 @@ function render(){
       c.setAttribute("r",8);
     });
     c.addEventListener("mouseleave",()=>{tip.style.opacity=0;c.setAttribute("r",6);});
-    c.addEventListener("click",()=>{ d.excluded=!d.excluded; render(); });
+    c.addEventListener("click",()=>{ d.excluded=!d.excluded; refreshAll(); });
   });
 
   renderStats(active, activeManual, outFlag);
@@ -433,12 +497,12 @@ document.getElementById("addBtn").addEventListener("click",()=>{
   DATA.push({id:uid++, date, t:new Date(date).getTime(), size, lt:+lt, excluded:false});
   msg.className="msg ok"; msg.textContent=`Dodano: ${size} · ${lt} dni`;
   document.getElementById("addLt").value="";
-  render();
+  refreshAll();
 });
 
 /* ---------- reset buttons ---------- */
-document.getElementById("resetExcl").addEventListener("click",()=>{ DATA.forEach(d=>d.excluded=false); render(); });
-document.getElementById("resetAll").addEventListener("click",()=>{ loadData(ORIGINAL); render(); document.getElementById("fileMsg").textContent=""; });
+document.getElementById("resetExcl").addEventListener("click",()=>{ DATA.forEach(d=>d.excluded=false); refreshAll(); });
+document.getElementById("resetAll").addEventListener("click",()=>{ loadData(ORIGINAL); refreshAll(); document.getElementById("fileMsg").textContent=""; });
 
 /* ---------- file drop / parse ---------- */
 const drop=document.getElementById("drop"), fileInput=document.getElementById("fileInput"), fileMsg=document.getElementById("fileMsg");
@@ -491,7 +555,7 @@ function handleFile(file){
       });
       fileMsg.className="msg ok";
       fileMsg.textContent=`Dodano ${added} rekordów`+(skipped?`, pominięto ${skipped}`:"")+`. Łącznie: ${DATA.length}.`;
-      render();
+      refreshAll();
     }catch(err){
       fileMsg.className="msg err";
       fileMsg.textContent="Nie udało się odczytać pliku: "+err.message;
@@ -500,7 +564,179 @@ function handleFile(file){
   reader.readAsArrayBuffer(file);
 }
 
-render();
+/* ================= PROCESS BEHAVIOUR CHART (XmR) ================= */
+const pbcState = { scope:"ALL", ltMin:null, ltMax:null, dMin:null, dMax:null, showMR:true };
+const pbcSvg=document.getElementById("pbcChart");
+const mrSvg=document.getElementById("mrChart");
+
+function pbcPasses(d){
+  if(pbcState.scope!=="ALL" && d.size!==pbcState.scope) return false;
+  if(pbcState.ltMin!=null && d.lt<pbcState.ltMin) return false;
+  if(pbcState.ltMax!=null && d.lt>pbcState.ltMax) return false;
+  if(pbcState.dMin!=null && d.t<pbcState.dMin) return false;
+  if(pbcState.dMax!=null && d.t>pbcState.dMax) return false;
+  return true;
+}
+
+function renderPBC(){
+  [pbcSvg,mrSvg].forEach(s=>{while(s.firstChild)s.removeChild(s.firstChild);});
+  mrSvg.style.display = pbcState.showMR ? "block" : "none";
+
+  // chronological order
+  const chosen = DATA.filter(pbcPasses).slice().sort((a,b)=>a.t-b.t);
+  const active = chosen.filter(d=>!d.excluded);   // limits computed from non-excluded points
+
+  const P={t:24,r:24,b:40,l:56};
+  const PW=900, PH=360, pw=PW-P.l-P.r, ph=PH-P.t-P.b;
+
+  if(active.length<2){
+    const msg=el("text",{x:PW/2,y:PH/2,"text-anchor":"middle",fill:"#889","font-size":14});
+    msg.textContent="Za mało punktów w wybranym zbiorze (min. 2)."; pbcSvg.appendChild(msg);
+    document.getElementById("pbcStats").innerHTML="";
+    return;
+  }
+
+  const vals=active.map(d=>d.lt);
+  const mean=avg(vals);
+  const mrArr=[]; for(let i=1;i<active.length;i++) mrArr.push(Math.abs(active[i].lt-active[i-1].lt));
+  const aMR=avg(mrArr);
+  const unpl=mean+2.66*aMR;
+  const lnplRaw=mean-2.66*aMR;
+  const lnpl=Math.max(0,lnplRaw);
+  const urlMR=3.268*aMR; // upper range limit for mR chart
+
+  // y-scale for X chart based on all chosen points + limits
+  const yMaxData=Math.max(unpl, ...chosen.map(d=>d.lt));
+  const ymax=Math.ceil(yMaxData*1.08/20)*20;
+  const xAt=i=> P.l + (chosen.length===1?pw/2 : i/(chosen.length-1)*pw);
+  const yAt=v=> P.t + ph - v/ymax*ph;
+
+  // grid + y ticks
+  const g=el("g",{class:"grid"});
+  for(let i=0;i<=5;i++){ const v=ymax/5*i, y=yAt(v);
+    g.appendChild(el("line",{x1:P.l,x2:PW-P.r,y1:y,y2:y}));
+    const lab=el("text",{x:P.l-8,y:y+4,"text-anchor":"end",fill:"#667","font-size":11}); lab.textContent=Math.round(v); g.appendChild(lab);
+  }
+  pbcSvg.appendChild(g);
+
+  // limit lines
+  function limit(v,color,label,dash){
+    const y=yAt(v);
+    pbcSvg.appendChild(el("line",{x1:P.l,x2:PW-P.r,y1:y,y2:y,stroke:color,"stroke-width":1.6,"stroke-dasharray":dash||"",opacity:.9}));
+    const lab=el("text",{x:PW-P.r-2,y:y-5,"text-anchor":"end",class:"pct-label",fill:color}); lab.textContent=`${label} = ${v.toFixed(1)}`; pbcSvg.appendChild(lab);
+  }
+  limit(unpl,"#dc2626","UNPL","6 4");
+  limit(mean,"#1a1a2e","CL (śr)");
+  limit(lnpl,"#dc2626","LNPL","6 4");
+  if(lnplRaw<0){
+    const y=yAt(lnpl);
+    const note=el("text",{x:P.l+4,y:y+14,class:"pct-label",fill:"#889"}); note.textContent="(obliczone "+lnplRaw.toFixed(1)+", przycięte do 0)"; pbcSvg.appendChild(note);
+  }
+
+  // connecting line for chosen points (chronological process line)
+  let path="";
+  chosen.forEach((d,i)=>{ path += (i?"L":"M")+xAt(i)+" "+yAt(d.lt)+" "; });
+  pbcSvg.appendChild(el("path",{d:path,fill:"none",stroke:"#94a3b8","stroke-width":1.4}));
+
+  // points
+  chosen.forEach((d,i)=>{
+    const cx=xAt(i), cy=yAt(d.lt);
+    const isSignal = !d.excluded && (d.lt>unpl || d.lt<lnpl);
+    let c;
+    if(d.excluded){
+      c=el("circle",{class:"dot-pt",cx,cy,r:5,fill:"#fff",stroke:"#9aa3af","stroke-width":2});
+    } else {
+      c=el("circle",{class:"dot-pt",cx,cy,r:5,fill:isSignal?"#dc2626":(COLORS[d.size]||"#334"),stroke:"#fff","stroke-width":1.5});
+    }
+    pbcSvg.appendChild(c);
+    c.addEventListener("mousemove",e=>{ tip.style.opacity=1; tip.style.left=(e.clientX+12)+"px"; tip.style.top=(e.clientY-10)+"px";
+      tip.innerHTML=`<b>${d.size}</b> · ${new Date(d.t).toLocaleDateString("pl-PL")}<br>${d.lt} dni`+(d.excluded?"<br><i>wykluczony</i>":"")+(isSignal?"<br><i>sygnał</i>":""); c.setAttribute("r",7); });
+    c.addEventListener("mouseleave",()=>{tip.style.opacity=0;c.setAttribute("r",5);});
+    c.addEventListener("click",()=>{ d.excluded=!d.excluded; refreshAll(); });
+  });
+
+  // x labels (sparse)
+  const step=Math.ceil(chosen.length/9);
+  chosen.forEach((d,i)=>{ if(i%step) return; const x=xAt(i);
+    const lab=el("text",{x,y:PH-P.b+18,"text-anchor":"middle",fill:"#667","font-size":10});
+    lab.textContent=new Date(d.t).toLocaleDateString("pl-PL",{day:"2-digit",month:"2-digit",year:"2-digit"}); pbcSvg.appendChild(lab);
+  });
+  const yt=el("text",{x:16,y:P.t+ph/2,fill:"#556","font-size":12,"font-weight":"bold","text-anchor":"middle",transform:`rotate(-90 16 ${P.t+ph/2})`});
+  yt.textContent="Czas realizacji (dni)"; pbcSvg.appendChild(yt);
+
+  /* ----- mR chart ----- */
+  if(pbcState.showMR){
+    const M2={t:20,r:24,b:28,l:56}, MW=900, MH=220, mw=MW-M2.l-M2.r, mh=MH-M2.t-M2.b;
+    const mrMax=Math.ceil(Math.max(urlMR,...mrArr)*1.1/10)*10 || 10;
+    // mR points align to chosen indices where both neighbors are active; simplest: plot mrArr against active order mapped onto chosen x
+    const activeIdx = chosen.map((d,i)=>({d,i})).filter(o=>!o.d.excluded);
+    const mYAt=v=>M2.t+mh - v/mrMax*mh;
+    const mXAt=k=> M2.l + (activeIdx.length<=1?mw/2 : (k)/(activeIdx.length-1)*mw);
+
+    const gg=el("g",{class:"grid"});
+    for(let i=0;i<=4;i++){ const v=mrMax/4*i, y=mYAt(v);
+      gg.appendChild(el("line",{x1:M2.l,x2:MW-M2.r,y1:y,y2:y}));
+      const lab=el("text",{x:M2.l-8,y:y+4,"text-anchor":"end",fill:"#667","font-size":11}); lab.textContent=Math.round(v); gg.appendChild(lab);
+    }
+    mrSvg.appendChild(gg);
+    // limits
+    [["URL",urlMR,"#dc2626","6 4"],["śr mR",aMR,"#1a1a2e",""]].forEach(([lab,v,col,dash])=>{
+      const y=mYAt(v);
+      mrSvg.appendChild(el("line",{x1:M2.l,x2:MW-M2.r,y1:y,y2:y,stroke:col,"stroke-width":1.6,"stroke-dasharray":dash,opacity:.9}));
+      const t=el("text",{x:MW-M2.r-2,y:y-5,"text-anchor":"end",class:"pct-label",fill:col}); t.textContent=`${lab} = ${v.toFixed(1)}`; mrSvg.appendChild(t);
+    });
+    // mR line + points (mrArr[k] sits at activeIdx k+1)
+    let mp="";
+    mrArr.forEach((v,k)=>{ const x=mXAt(k+1), y=mYAt(v); mp+=(k?"L":"M")+x+" "+y+" "; });
+    mrSvg.appendChild(el("path",{d:mp,fill:"none",stroke:"#94a3b8","stroke-width":1.4}));
+    mrArr.forEach((v,k)=>{ const x=mXAt(k+1), y=mYAt(v); const sig=v>urlMR;
+      mrSvg.appendChild(el("circle",{cx:x,cy:y,r:4,fill:sig?"#dc2626":"#64748b",stroke:"#fff","stroke-width":1.2}));
+    });
+    const myt=el("text",{x:16,y:M2.t+mh/2,fill:"#556","font-size":12,"font-weight":"bold","text-anchor":"middle",transform:`rotate(-90 16 ${M2.t+mh/2})`});
+    myt.textContent="Ruchomy rozstęp"; mrSvg.appendChild(myt);
+  }
+
+  // stats
+  const signals=chosen.filter(d=>!d.excluded && (d.lt>unpl||d.lt<lnpl)).length;
+  const scopeLabel = pbcState.scope==="ALL"?"Całość":"Rozmiar "+pbcState.scope;
+  document.getElementById("pbcStats").innerHTML =
+    `<div class="statgrp"><span class="tag">${scopeLabel}</span>`+
+    `<span><b>${active.length}</b> pkt w obliczeniach`+(chosen.length-active.length?` · ${chosen.length-active.length} wykluczonych`:"")+`</span>`+
+    `<span>CL <b>${mean.toFixed(1)}</b></span>`+
+    `<span>UNPL <b>${unpl.toFixed(1)}</b></span>`+
+    `<span>LNPL <b>${lnpl.toFixed(1)}</b></span>`+
+    `<span>śr mR <b>${aMR.toFixed(1)}</b></span>`+
+    `<span>sygnały <b style="color:${signals?'#dc2626':'#1a1a2e'}">${signals}</b></span></div>`;
+}
+
+/* refresh coordinator */
+function refreshAll(){ render(); renderPBC(); }
+
+/* tab switching */
+document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));
+  t.classList.add("active");
+  document.getElementById("panel-"+t.dataset.tab).classList.add("active");
+  document.getElementById("subtitle").textContent = t.dataset.tab==="pbc"
+    ? "Karta zachowania procesu (XmR) · punkty w kolejności chronologicznej · granice = średnia ± 2,66 × średni mR"
+    : "Oś X: data ukończenia · Oś Y: czas realizacji (dni) · Kliknij punkt, aby wykluczyć go z obliczeń";
+  refreshAll();
+}));
+
+/* pbc controls */
+document.getElementById("pbcScope").addEventListener("click",e=>{
+  const chip=e.target.closest(".chip"); if(!chip)return;
+  document.querySelectorAll("#pbcScope .chip").forEach(c=>c.classList.remove("active-scope"));
+  chip.classList.add("active-scope"); pbcState.scope=chip.dataset.scope; renderPBC();
+});
+document.getElementById("pbcLtMin").addEventListener("input",e=>{pbcState.ltMin=e.target.value===""?null:+e.target.value;renderPBC();});
+document.getElementById("pbcLtMax").addEventListener("input",e=>{pbcState.ltMax=e.target.value===""?null:+e.target.value;renderPBC();});
+document.getElementById("pbcDMin").addEventListener("input",e=>{pbcState.dMin=e.target.value===""?null:new Date(e.target.value).getTime();renderPBC();});
+document.getElementById("pbcDMax").addEventListener("input",e=>{pbcState.dMax=e.target.value===""?null:new Date(e.target.value+"T23:59:59").getTime();renderPBC();});
+document.getElementById("pbcShowMR").addEventListener("change",e=>{pbcState.showMR=e.target.checked;renderPBC();});
+
+refreshAll();
 </script>
 </body>
 </html>
