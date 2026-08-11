@@ -309,16 +309,30 @@ function drawX(data,st,sig){
     svg.appendChild(el("line",{x1:mL,x2:W-mR,y1:yy,y2:yy,stroke:"var(--grid)","stroke-width":1}));
     const tx=el("text",{x:mL-8,y:yy+4,fill:"var(--ink-dim)","font-size":11,"text-anchor":"end"});
     tx.textContent=val.toFixed(0);svg.appendChild(tx);}
-  // sigma zones
+  // sigma zones — stałe gradientowe zaciemnienie, narastające ku granicom
   const band=(a,b,col,op)=>{const yA=y(a),yB=y(b);
     svg.appendChild(el("rect",{x:mL,y:Math.min(yA,yB),width:iW,height:Math.abs(yA-yB),fill:col,opacity:op}));};
-  if(st.s2||state.s2){band(st.z(2).p,st.z(2).m,"var(--sig2)",0.05);}
+  // strefy zawsze widoczne: im dalej od średniej, tym ciemniej/mocniej
+  // 2σ–3σ (najmocniejsze, kolor pomarańczowy jak granice)
+  band(st.z(3).p,st.z(2).p,"var(--limit)",0.14);
+  band(st.z(2).m,st.z(3).m,"var(--limit)",0.14);
+  // 1σ–2σ (średnie, żółte — tu łapią gwiazdki i kwadraty)
+  band(st.z(2).p,st.z(1).p,"var(--sig2)",0.10);
+  band(st.z(1).m,st.z(2).m,"var(--sig2)",0.10);
+  // 0–1σ (najlżejsze, zielone — strefa "normalna")
+  band(st.z(1).p,st.z(1).m,"var(--sig1)",0.05);
+  // dodatkowe wzmocnienie po zaznaczeniu checkboxów
+  if(st.s2||state.s2){band(st.z(2).p,st.z(2).m,"var(--sig2)",0.06);}
   if(st.s1||state.s1){band(st.z(1).p,st.z(1).m,"var(--sig1)",0.06);}
   const limLine=(v,col,dash,lab)=>{const yy=y(v);
     svg.appendChild(el("line",{x1:mL,x2:W-mR,y1:yy,y2:yy,stroke:col,"stroke-width":1.5,"stroke-dasharray":dash}));
     const t=el("text",{x:W-mR-4,y:yy-4,fill:col,"font-size":10.5,"text-anchor":"end"});t.textContent=lab;svg.appendChild(t);};
-  if(state.s1){limLine(st.z(1).p,"var(--sig1)","2 3","+1σ");limLine(st.z(1).m,"var(--sig1)","2 3","-1σ");}
-  if(state.s2){limLine(st.z(2).p,"var(--sig2)","2 3","+2σ");limLine(st.z(2).m,"var(--sig2)","2 3","-2σ");}
+  // cienkie linie stref — zawsze widoczne jako krawędzie zaciemnienia
+  const zLine=(v,col,lab)=>{const yy=y(v);
+    svg.appendChild(el("line",{x1:mL,x2:W-mR,y1:yy,y2:yy,stroke:col,"stroke-width":1,"stroke-dasharray":"2 3",opacity:.55}));
+    const t=el("text",{x:W-mR-4,y:yy-3,fill:col,"font-size":9.5,"text-anchor":"end",opacity:.7});t.textContent=lab;svg.appendChild(t);};
+  zLine(st.z(1).p,"var(--sig1)","+1σ"); if(st.z(1).m>0) zLine(st.z(1).m,"var(--sig1)","-1σ");
+  zLine(st.z(2).p,"var(--sig2)","+2σ"); if(st.z(2).m>0) zLine(st.z(2).m,"var(--sig2)","-2σ");
   limLine(st.unpl,"var(--limit)","6 4","UNPL "+st.unpl.toFixed(2));
   limLine(st.lnpl,"var(--limit)","6 4","LNPL "+st.lnpl.toFixed(2));
   limLine(st.mean,"var(--center)","","Śr "+st.mean.toFixed(2));
@@ -414,7 +428,10 @@ function renderLegend(){
      <div class="li"><span style="color:var(--sig2)">■</span> 2 z 3 poza 2σ</div>
      <div class="li"><span style="color:var(--sig2)">★</span> 3 z 5 poza 1σ</div>
      <div class="li"><span style="color:var(--sig1)">!</span> 8 po jednej stronie</div>
-     <div class="li"><span style="color:#6b7683">○</span> wykluczony</div>`;
+     <div class="li"><span style="color:#6b7683">○</span> wykluczony</div>
+     <div class="li"><span style="display:inline-block;width:14px;height:10px;background:var(--sig1);opacity:.4;border-radius:2px"></span> strefa 0–1σ</div>
+     <div class="li"><span style="display:inline-block;width:14px;height:10px;background:var(--sig2);opacity:.5;border-radius:2px"></span> strefa 1–2σ</div>
+     <div class="li"><span style="display:inline-block;width:14px;height:10px;background:var(--limit);opacity:.5;border-radius:2px"></span> strefa 2–3σ</div>`;
 }
 
 function render(){
