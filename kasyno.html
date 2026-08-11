@@ -6,30 +6,55 @@
 <title>Monte Carlo · Prognoza dostarczania</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: #0b0f1a; color: #e2e8f0;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    padding: 32px 20px;
-  }
-  .wrap { max-width: 960px; margin: 0 auto; }
+  body { background: #0b0f1a; color: #e2e8f0; font-family: 'Inter', system-ui, -apple-system, sans-serif; padding: 32px 20px; }
+  .wrap { max-width: 1000px; margin: 0 auto; }
   .eyebrow { font-size: 11px; letter-spacing: 0.18em; color: #64748b; font-weight: 600; margin-bottom: 10px; }
   h1 { font-size: 38px; font-weight: 800; margin-bottom: 8px; letter-spacing: -0.02em; line-height: 1.05; }
   .sub { font-size: 13.5px; color: #94a3b8; line-height: 1.5; margin-bottom: 28px; }
 
-  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 28px; }
-  .control { background: #111827; border: 1px solid #1e293b; border-radius: 14px; padding: 16px 18px; }
-  .ctl-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
-  .ctl-label { font-size: 13px; font-weight: 600; color: #cbd5e1; }
-  .ctl-val { font-size: 18px; font-weight: 800; color: #7dd3fc; font-variant-numeric: tabular-nums; }
-  input[type=range] { width: 100%; accent-color: #7dd3fc; cursor: pointer; }
-  .ctl-hint { font-size: 11.5px; color: #64748b; margin-top: 10px; }
+  .setup { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .field { background: #111827; border: 1px solid #1e293b; border-radius: 14px; padding: 16px 18px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 10px; }
+  .field input[type=number], .field input[type=date] {
+    width: 100%; background: #0b0f1a; border: 1px solid #334155; border-radius: 8px;
+    color: #e2e8f0; font-size: 16px; font-weight: 700; padding: 8px 10px; font-family: inherit;
+  }
+  .field input:focus { outline: none; border-color: #7dd3fc; }
+  .field .hint { font-size: 11px; color: #64748b; margin-top: 8px; }
 
+  .toggle-field { display: flex; flex-direction: column; }
   .toggle { display: flex; align-items: center; gap: 10px; background: #1e293b; border: none;
     border-radius: 999px; padding: 6px 14px 6px 6px; cursor: pointer; width: 100%; transition: background .2s; }
   .toggle.on { background: #0c4a6e; }
   .knob { width: 22px; height: 22px; border-radius: 50%; background: #64748b; transition: transform .2s, background .2s; display: block; }
   .toggle.on .knob { background: #7dd3fc; transform: translateX(4px); }
-  .toggle-txt { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+  .toggle-txt { font-size: 13px; font-weight: 600; }
+
+  .table-block { background: #111827; border: 1px solid #1e293b; border-radius: 16px; padding: 22px 24px; margin-bottom: 24px; }
+  .table-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .table-desc { font-size: 12px; color: #64748b; margin-bottom: 18px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; font-weight: 600; text-align: left; padding: 0 8px 12px; }
+  th.num, td.num { text-align: right; }
+  td { padding: 6px 8px; border-top: 1px solid #1e293b; }
+  td.month { font-weight: 700; font-size: 14px; color: #e2e8f0; }
+  table input { width: 68px; background: #0b0f1a; border: 1px solid #334155; border-radius: 6px;
+    color: #e2e8f0; font-size: 14px; font-weight: 600; padding: 5px 8px; text-align: right; font-family: inherit; }
+  table input:focus { outline: none; border-color: #7dd3fc; }
+  .gus-cell { color: #f0abfc; font-weight: 700; font-size: 13px; }
+  .gus-off { color: #475569; }
+
+  .load-block { background: #111827; border: 1px solid #1e293b; border-radius: 16px; padding: 22px 24px; margin-bottom: 24px; }
+  .load-title { font-size: 15px; font-weight: 700; margin-bottom: 18px; }
+  .load-chart { display: flex; gap: 10px; align-items: flex-end; }
+  .load-col { flex: 1; display: flex; flex-direction: column; align-items: center; }
+  .load-stack { width: 100%; height: 150px; border-radius: 8px 8px 0 0; overflow: hidden; display: flex; flex-direction: column-reverse; background: #0b0f1a; border: 1px solid #1e293b; }
+  .load-seg { width: 100%; }
+  .load-month { font-size: 12px; font-weight: 700; margin-top: 8px; }
+  .load-pct { font-size: 10px; color: #64748b; }
+  .legend { display: flex; gap: 18px; margin-top: 18px; font-size: 12px; color: #94a3b8; flex-wrap: wrap; }
+  .dot-wrap { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 24px; }
   .card { background: #111827; border: 1px solid #1e293b; border-radius: 16px; padding: 20px 22px 24px; position: relative; overflow: hidden; }
@@ -37,7 +62,7 @@
   .card-tag { font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 12px; }
   .card-sprints { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums; }
   .card-sprints-u { font-size: 14px; font-weight: 600; color: #64748b; }
-  .card-big { font-size: 15px; font-weight: 700; color: #cbd5e1; letter-spacing: -0.01em; margin: 8px 0 4px; line-height: 1.15; }
+  .card-big { font-size: 15px; font-weight: 700; color: #cbd5e1; margin: 8px 0 4px; line-height: 1.15; }
   .card-small { font-size: 12.5px; color: #94a3b8; }
   .card-rule { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; opacity: 0.8; }
 
@@ -51,14 +76,14 @@
 
   .hist-block { background: #111827; border: 1px solid #1e293b; border-radius: 16px; padding: 22px 24px; margin-bottom: 20px; }
   .hist-title { font-size: 15px; font-weight: 700; margin-bottom: 20px; }
-  .hist { display: flex; align-items: flex-end; gap: 4px; height: 160px; }
+  .hist-wrap { position: relative; }
+  .hist-zones { position: absolute; inset: 0 0 30px 0; border-radius: 8px; overflow: hidden; z-index: 0; pointer-events: none; }
+  .hist { display: flex; align-items: flex-end; gap: 4px; height: 160px; position: relative; z-index: 1; }
   .hist-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
   .bar { width: 100%; border-radius: 3px 3px 0 0; min-height: 2px; transition: height .3s; }
+  .zone-tick { position: absolute; top: 0; bottom: 30px; width: 1px; background: rgba(226,232,240,.35); z-index: 1; }
+  .zone-tick span { position: absolute; top: -2px; left: 4px; font-size: 9px; color: #94a3b8; white-space: nowrap; font-weight: 600; }
   .bar-label { font-size: 9px; color: #475569; margin-top: 6px; white-space: nowrap; transform: rotate(-45deg); transform-origin: center; height: 24px; }
-  .legend { display: flex; gap: 18px; margin-top: 20px; font-size: 12px; color: #94a3b8; }
-  .dot-wrap { display: inline-flex; align-items: center; gap: 6px; }
-  .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-
   footer { font-size: 11.5px; color: #475569; line-height: 1.6; margin-top: 8px; }
 </style>
 </head>
@@ -68,34 +93,53 @@
   <h1>Kiedy skończymy backlog?</h1>
   <p class="sub" id="sub"></p>
 
-  <div class="controls">
-    <div class="control">
-      <div class="ctl-top">
-        <span class="ctl-label">Nowe wymagania (scope creep)</span>
-        <span class="ctl-val" id="scopeVal">+25%</span>
-      </div>
-      <input type="range" min="0" max="35" value="25" id="scope">
-      <div class="ctl-hint" id="scopeHint"></div>
+  <div class="setup">
+    <div class="field">
+      <label for="backlog">Backlog startowy</label>
+      <input type="number" id="backlog" value="62" min="1" max="500">
+      <div class="hint">elementów na start</div>
     </div>
-
-    <div class="control">
-      <div class="ctl-top">
-        <span class="ctl-label">Sezonowe naprawy (od IX)</span>
-        <span class="ctl-val" id="repairVal">25%</span>
-      </div>
-      <input type="range" min="0" max="50" value="25" id="repair">
-      <div class="ctl-hint" id="repairHint"></div>
+    <div class="field">
+      <label for="startDate">Data startu</label>
+      <input type="date" id="startDate" value="2026-09-01">
+      <div class="hint">początek pierwszego sprintu</div>
     </div>
-
-    <div class="control">
-      <div class="ctl-top">
-        <span class="ctl-label">Dane GUS o zwolnieniach</span>
-      </div>
+    <div class="field toggle-field">
+      <label>Warstwa GUS (chorobowość)</label>
       <button class="toggle" id="gusToggle" aria-pressed="false">
         <span class="knob"></span>
         <span class="toggle-txt" id="gusTxt">Wyłączone</span>
       </button>
-      <div class="ctl-hint">Skaluje moc wg chorobowości vs. baza IV–VII</div>
+      <div class="hint">dolicza chorobowość per miesiąc</div>
+    </div>
+  </div>
+
+  <div class="table-block">
+    <div class="table-title">Plan miesięczny (6 miesięcy od startu)</div>
+    <div class="table-desc">Nowe wymagania w sztukach; naprawy i urlopy jako % zajętości zespołu. GUS liczony automatycznie, gdy warstwa włączona.</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Miesiąc</th>
+          <th class="num">Nowe wymagania (szt.)</th>
+          <th class="num">Naprawy (%)</th>
+          <th class="num">Urlopy (%)</th>
+          <th class="num">GUS (%)</th>
+        </tr>
+      </thead>
+      <tbody id="planBody"></tbody>
+    </table>
+  </div>
+
+  <div class="load-block">
+    <div class="load-title">Obciążenie zespołu miesiąc po miesiącu</div>
+    <div class="load-chart" id="loadChart"></div>
+    <div class="legend">
+      <span class="dot-wrap"><span class="dot" style="background:#34d399"></span> praca nad backlogiem</span>
+      <span class="dot-wrap"><span class="dot" style="background:#fbbf24"></span> naprawy</span>
+      <span class="dot-wrap"><span class="dot" style="background:#60a5fa"></span> urlopy</span>
+      <span class="dot-wrap"><span class="dot" style="background:#f0abfc"></span> GUS (chorobowość)</span>
+      <span class="dot-wrap"><span class="dot" style="background:#334155"></span> święta XII/I</span>
     </div>
   </div>
 
@@ -105,18 +149,21 @@
     <div class="ye-title">Ile zdążymy do końca 2026?</div>
     <div class="ye-row" id="yeRow"></div>
     <div class="ye-note">
-      Święta: 50% zespołu urlopuje w tygodniu przed Bożym Narodzeniem, 100% między
-      świętami a Trzech Króli (6.01), 50% w tygodniu po. Ten spadek mocy jest wliczony.
+      Święta (globalnie): 50% zespołu urlopuje w tygodniu przed Bożym Narodzeniem, 100% między
+      świętami a Trzech Króli (6.01), 50% w tygodniu po. Ten spadek mocy jest wliczony niezależnie od tabeli.
     </div>
   </div>
 
   <div class="hist-block">
     <div class="hist-title">Rozkład daty ukończenia całego backlogu</div>
-    <div class="hist" id="hist"></div>
+    <div class="hist-wrap">
+      <div class="hist-zones" id="histZones"></div>
+      <div class="hist" id="hist"></div>
+    </div>
     <div class="legend">
-      <span class="dot-wrap"><span class="dot" style="background:#7dd3fc"></span> 85%</span>
-      <span class="dot-wrap"><span class="dot" style="background:#c4b5fd"></span> 95%</span>
-      <span class="dot-wrap"><span class="dot" style="background:#334155"></span> pozostałe</span>
+      <span class="dot-wrap"><span class="dot" style="background:#7dd3fc"></span> 0–85% (najbardziej prawdopodobne)</span>
+      <span class="dot-wrap"><span class="dot" style="background:#c4b5fd"></span> 85–95% (bufor)</span>
+      <span class="dot-wrap"><span class="dot" style="background:#334155"></span> 95–100% (ogon)</span>
     </div>
   </div>
 
@@ -124,21 +171,39 @@
 </div>
 
 <script>
-// ── Fixed inputs ─────────────────────────────────────────────
-const BACKLOG = 62;
-const THROUGHPUT = [5, 4, 4, 5, 6, 4, 2, 3, 2, 5, 6];
+const THROUGHPUT = [5,4,4,5,6,4,2,3,2,5,6];
 const SPRINT_DAYS = 14;
-const START = new Date("2026-09-01");
-const YEAR_END = new Date("2026-12-31");
 const RUNS = 10000;
+const MONTHS_PL = ["stycznia","lutego","marca","kwietnia","maja","czerwca","lipca","sierpnia","września","października","listopada","grudnia"];
+const MONTHS_SHORT = ["sty","lut","mar","kwi","maj","cze","lip","sie","wrz","paź","lis","gru"];
 
-const GUS = { 0:10.0,1:9.7,2:9.8,3:8.2,4:7.6,5:7.4,6:6.8,7:6.7,8:7.8,9:9.2,10:8.6,11:8.2 };
+// GUS sickness share by month; baseline = source data window (Apr–Jul)
+const GUS = {0:10.0,1:9.7,2:9.8,3:8.2,4:7.6,5:7.4,6:6.8,7:6.7,8:7.8,9:9.2,10:8.6,11:8.2};
 const GUS_BASE = (GUS[3]+GUS[4]+GUS[5]+GUS[6])/4;
+function gusPct(monthIdx){ return Math.max(0, Math.round((1 - GUS_BASE/GUS[monthIdx]) * 100)); }
 
-function holidayFactor(sprintStart, sprintEnd) {
+// ── State ──
+let backlog = 62;
+let startDate = new Date("2026-09-01");
+let gusOn = false;
+// plan[i] = { newItems, repair, vacation } for the i-th month from start
+let plan = [];
+
+function monthKeyFromOffset(off) {
+  const d = new Date(startDate.getFullYear(), startDate.getMonth() + off, 1);
+  return { idx: d.getMonth(), year: d.getFullYear(), date: d };
+}
+function initPlan() {
+  plan = [];
+  for (let i = 0; i < 6; i++) plan.push({ newItems: 0, repair: 25, vacation: 0 });
+}
+initPlan();
+
+// ── Holiday factor (global Dec/Jan) ──
+function holidayFactor(sStart, sEnd) {
   let sum = 0, n = 0;
-  const d = new Date(sprintStart);
-  while (d < sprintEnd) {
+  const d = new Date(sStart);
+  while (d < sEnd) {
     const m = d.getMonth(), day = d.getDate();
     let avail = 1;
     if (m === 11) { if (day>=18 && day<=24) avail=0.5; else if (day>=25) avail=0; }
@@ -148,35 +213,71 @@ function holidayFactor(sprintStart, sprintEnd) {
   }
   return n ? sum/n : 1;
 }
+
+// return the plan row that applies to a given calendar month, or null
+function planForMonth(monthIdx, year) {
+  for (let i = 0; i < 6; i++) {
+    const mk = monthKeyFromOffset(i);
+    if (mk.idx === monthIdx && mk.year === year) return plan[i];
+  }
+  return null;
+}
+
 function pick(a){ return a[(Math.random()*a.length)|0]; }
 function percentile(s,p){ return s[Math.min(s.length-1, Math.floor((p/100)*s.length))]; }
-function fractionBefore(start,end,cut){ if(cut<=start)return 0; if(cut>=end)return 1; return (cut-start)/(end-start); }
-function fmtDate(d){ return d.toLocaleDateString("pl-PL",{day:"numeric",month:"long",year:"numeric"}); }
-function fmtShort(d){ return d.toLocaleDateString("pl-PL",{month:"short",day:"numeric"}); }
-function sprintsToDate(s){ const d=new Date(START); d.setDate(START.getDate()+s*SPRINT_DAYS); return d; }
+function fractionBefore(a,b,c){ if(c<=a)return 0; if(c>=b)return 1; return (c-a)/(b-a); }
+function fmtDate(d){ return d.getDate()+" "+MONTHS_PL[d.getMonth()]+" "+d.getFullYear(); }
+function fmtShort(d){ return d.getDate()+" "+MONTHS_SHORT[d.getMonth()]; }
+function sprintsToDate(s){ const d=new Date(startDate); d.setDate(startDate.getDate()+s*SPRINT_DAYS); return d; }
 
-function runSimulation(scopeAdd, repairPct, gusOn) {
+// capacity multiplier for a sprint (0..1) given month-level loads
+function capacityMult(sStart, sEnd) {
+  const m = sStart.getMonth(), y = sStart.getFullYear();
+  const row = planForMonth(m, y);
+  let busy = 0;
+  if (row) busy += (row.repair + row.vacation) / 100;
+  if (gusOn) busy += gusPct(m) / 100;
+  busy = Math.min(0.95, busy);
+  return (1 - busy) * holidayFactor(sStart, sEnd);
+}
+
+// added items entering scope in a given sprint window
+function scopeAddedInSprint(sStart, sEnd) {
+  // distribute a month's newItems across that month; approximate by
+  // crediting items when sprint starts in that month
+  const m = sStart.getMonth(), y = sStart.getFullYear();
+  const row = planForMonth(m, y);
+  if (!row) return 0;
+  // spread the month's items over ~2 sprints -> credit half per sprint start in-month
+  return row.newItems;
+}
+
+function totalAddedItems() {
+  return plan.reduce((s, r) => s + Number(r.newItems || 0), 0);
+}
+
+function runSimulation() {
   const finishSprints = [], doneByYearEnd = [];
-  const repairMult = 1 - repairPct/100;
-  const target = BACKLOG + Math.round(BACKLOG * scopeAdd/100);
+  const yearEnd = new Date(startDate.getFullYear(), 11, 31);
+  const target = backlog + totalAddedItems();
 
-  for (let r=0; r<RUNS; r++) {
-    let done=0, sprint=0, doneAtYearEnd=null;
-    while (done<target && sprint<200) {
-      const sStart = new Date(START); sStart.setDate(START.getDate()+sprint*SPRINT_DAYS);
+  for (let r = 0; r < RUNS; r++) {
+    let done = 0, sprint = 0, doneAtYearEnd = null;
+    const monthsCredited = {};
+    while (done < target && sprint < 300) {
+      const sStart = new Date(startDate); sStart.setDate(startDate.getDate()+sprint*SPRINT_DAYS);
       const sEnd = new Date(sStart); sEnd.setDate(sStart.getDate()+SPRINT_DAYS);
-      let capacity = pick(THROUGHPUT) * repairMult;
-      capacity *= holidayFactor(sStart, sEnd);
-      if (gusOn) capacity *= GUS_BASE / GUS[sStart.getMonth()];
-      const delivered = Math.max(0, Math.round(capacity));
+      let cap = pick(THROUGHPUT) * capacityMult(sStart, sEnd);
+      const delivered = Math.max(0, Math.round(cap));
       done += delivered;
-      if (doneAtYearEnd===null && sEnd>YEAR_END) {
+      if (doneAtYearEnd === null && sEnd > yearEnd) {
         doneAtYearEnd = Math.min(done - delivered + Math.max(0, Math.round(
-          delivered * fractionBefore(sStart, sEnd, YEAR_END))), target);
+          delivered * fractionBefore(sStart, sEnd, yearEnd))), target);
       }
       sprint++;
+      if (sprint > 300) break;
     }
-    if (doneAtYearEnd===null) doneAtYearEnd = Math.min(done, target);
+    if (doneAtYearEnd === null) doneAtYearEnd = Math.min(done, target);
     finishSprints.push(sprint);
     doneByYearEnd.push(Math.min(doneAtYearEnd, target));
   }
@@ -185,20 +286,66 @@ function runSimulation(scopeAdd, repairPct, gusOn) {
   return { finishSprints, doneByYearEnd, target };
 }
 
-// ── State + render ───────────────────────────────────────────
-let scopeAdd = 25, repairPct = 25, gusOn = false;
+// ── Render ──
+function renderPlanTable() {
+  const body = document.getElementById("planBody");
+  body.innerHTML = plan.map((row, i) => {
+    const mk = monthKeyFromOffset(i);
+    const label = MONTHS_SHORT[mk.idx] + " " + mk.year;
+    const g = gusOn ? gusPct(mk.idx) + "%" : "—";
+    return `<tr>
+      <td class="month">${label}</td>
+      <td class="num"><input type="number" min="0" max="50" value="${row.newItems}" data-i="${i}" data-f="newItems"></td>
+      <td class="num"><input type="number" min="0" max="90" value="${row.repair}" data-i="${i}" data-f="repair"></td>
+      <td class="num"><input type="number" min="0" max="90" value="${row.vacation}" data-i="${i}" data-f="vacation"></td>
+      <td class="num gus-cell ${gusOn?'':'gus-off'}">${g}</td>
+    </tr>`;
+  }).join("");
+  body.querySelectorAll("input").forEach(inp => {
+    inp.addEventListener("input", e => {
+      const i = +e.target.dataset.i, f = e.target.dataset.f;
+      plan[i][f] = Math.max(0, +e.target.value || 0);
+      render();
+    });
+  });
+}
+
+function renderLoadChart() {
+  const chart = document.getElementById("loadChart");
+  chart.innerHTML = plan.map((row, i) => {
+    const mk = monthKeyFromOffset(i);
+    const repair = Math.min(90, row.repair);
+    const vac = Math.min(90, row.vacation);
+    const gus = gusOn ? gusPct(mk.idx) : 0;
+    // holiday as approximate month-level loss for Dec/Jan
+    let holiday = 0;
+    if (mk.idx === 11) holiday = 22;
+    else if (mk.idx === 0) holiday = 45;
+    let busy = repair + vac + gus + holiday;
+    if (busy > 100) busy = 100;
+    const work = Math.max(0, 100 - busy);
+    const seg = (h, c) => h > 0 ? `<div class="load-seg" style="height:${h}%;background:${c}"></div>` : "";
+    return `<div class="load-col">
+      <div class="load-stack">
+        ${seg(work, "#34d399")}
+        ${seg(repair, "#fbbf24")}
+        ${seg(vac, "#60a5fa")}
+        ${seg(gus, "#f0abfc")}
+        ${seg(holiday, "#334155")}
+      </div>
+      <div class="load-month">${MONTHS_SHORT[mk.idx]}</div>
+      <div class="load-pct">${work}% pracy</div>
+    </div>`;
+  }).join("");
+}
 
 function render() {
-  const sim = runSimulation(scopeAdd, repairPct, gusOn);
+  const sim = runSimulation();
   const p85 = percentile(sim.finishSprints,85), p95 = percentile(sim.finishSprints,95), p50 = percentile(sim.finishSprints,50);
   const ye85 = percentile(sim.doneByYearEnd,15), ye95 = percentile(sim.doneByYearEnd,5), ye50 = percentile(sim.doneByYearEnd,50);
 
   document.getElementById("sub").textContent =
-    `${RUNS.toLocaleString("pl-PL")} symulacji · start ${fmtDate(START)} · bazowa przepustowość z danych IV–VII 2026 (${THROUGHPUT.join(", ")} elem./sprint)`;
-  document.getElementById("scopeVal").textContent = "+"+scopeAdd+"%";
-  document.getElementById("scopeHint").textContent = `Powiększa zakres do ${sim.target} elementów`;
-  document.getElementById("repairVal").textContent = repairPct+"%";
-  document.getElementById("repairHint").textContent = `Zabiera ${repairPct}% mocy przerobowej`;
+    `${RUNS.toLocaleString("pl-PL")} symulacji · start ${fmtDate(startDate)} · backlog ${backlog}+${totalAddedItems()} = ${sim.target} · przepustowość IV–VII 2026 (${THROUGHPUT.join(", ")})`;
 
   document.getElementById("cards").innerHTML = [
     card("#7dd3fc","85% pewności", fmtDate(sprintsToDate(p85)), "cały zakres ukończony", false, p85),
@@ -212,19 +359,40 @@ function render() {
     yeStat(ye50,"mediana (50%)","#94a3b8",sim.target,true),
   ].join("");
 
-  // histogram
   const counts = {};
   sim.finishSprints.forEach(s => counts[s]=(counts[s]||0)+1);
   const keys = Object.keys(counts).map(Number).sort((a,b)=>a-b);
   const max = Math.max(...keys.map(k=>counts[k]));
+  const n = keys.length;
+  // fractional x-position (0..1) of the p85/p95 boundaries across the bar row
+  const idx85 = keys.findIndex(k => k > p85);
+  const idx95 = keys.findIndex(k => k > p95);
+  const b85 = (idx85 === -1 ? n : idx85) / n * 100;
+  const b95 = (idx95 === -1 ? n : idx95) / n * 100;
+  // gradient background: three confidence zones fading left→right
+  document.getElementById("histZones").style.background =
+    `linear-gradient(90deg,
+      rgba(125,211,252,0.28) 0%,
+      rgba(125,211,252,0.18) ${b85}%,
+      rgba(196,181,253,0.20) ${b85}%,
+      rgba(196,181,253,0.10) ${b95}%,
+      rgba(51,65,85,0.15) ${b95}%,
+      rgba(51,65,85,0.05) 100%)`;
+  document.getElementById("histZones").innerHTML =
+    `<div class="zone-tick" style="left:${b85}%"><span>85%</span></div>
+     <div class="zone-tick" style="left:${b95}%"><span>95%</span></div>`;
   document.getElementById("hist").innerHTML = keys.map(k=>{
     const h = counts[k]/max*100;
-    const col = k===p95 ? "#c4b5fd" : k===p85 ? "#7dd3fc" : "#334155";
-    return `<div class="hist-col"><div class="bar" style="height:${h}%;background:${col}" title="${k} sprintów: ${counts[k]} symulacji"></div><div class="bar-label">${fmtShort(sprintsToDate(k))}</div></div>`;
+    let col = "#334155";              // domyślnie szary
+    if (k === p85) col = "#7dd3fc";   // słupek na progu 85% — niebieski
+    else if (k === p95) col = "#c4b5fd"; // słupek na progu 95% — fioletowy
+    return `<div class="hist-col"><div class="bar" style="height:${h}%;background:${col}" title="${k} sprintów"></div><div class="bar-label">${fmtShort(sprintsToDate(k))}</div></div>`;
   }).join("");
 
   document.getElementById("footer").textContent =
-    `Model: losowanie historycznej przepustowości na sprint, korygowane o naprawy sezonowe, urlopy świąteczne (XII/I)${gusOn?" oraz chorobowość GUS":""} i przyrost zakresu. Dane wejściowe zebrane w oknie kwiecień–lipiec 2026.`;
+    `Model: losowanie historycznej przepustowości na sprint, korygowane o naprawy i urlopy per miesiąc, urlopy świąteczne XII/I${gusOn?" oraz chorobowość GUS":""} oraz nowe wymagania dodawane w sztukach. Dane wejściowe: kwiecień–lipiec 2026.`;
+
+  renderLoadChart();
 }
 
 function card(accent, tag, big, small, muted, sprints) {
@@ -240,17 +408,22 @@ function yeStat(n, label, accent, target, muted) {
     <div class="ye-label">${label}</div></div>`;
 }
 
-document.getElementById("scope").addEventListener("input", e => { scopeAdd=+e.target.value; render(); });
-document.getElementById("repair").addEventListener("input", e => { repairPct=+e.target.value; render(); });
+// ── Wire up setup fields ──
+document.getElementById("backlog").addEventListener("input", e => { backlog = Math.max(1, +e.target.value||1); render(); });
+document.getElementById("startDate").addEventListener("change", e => {
+  const v = e.target.value; if (v) { startDate = new Date(v + "T00:00:00"); renderPlanTable(); render(); }
+});
 document.getElementById("gusToggle").addEventListener("click", () => {
   gusOn = !gusOn;
   const t = document.getElementById("gusToggle");
   t.classList.toggle("on", gusOn);
   t.setAttribute("aria-pressed", gusOn);
   document.getElementById("gusTxt").textContent = gusOn ? "Uwzględniane" : "Wyłączone";
+  renderPlanTable();
   render();
 });
 
+renderPlanTable();
 render();
 </script>
 </body>
