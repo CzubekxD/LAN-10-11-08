@@ -1,1 +1,257 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monte Carlo · Prognoza dostarczania</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0b0f1a; color: #e2e8f0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    padding: 32px 20px;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  .eyebrow { font-size: 11px; letter-spacing: 0.18em; color: #64748b; font-weight: 600; margin-bottom: 10px; }
+  h1 { font-size: 38px; font-weight: 800; margin-bottom: 8px; letter-spacing: -0.02em; line-height: 1.05; }
+  .sub { font-size: 13.5px; color: #94a3b8; line-height: 1.5; margin-bottom: 28px; }
 
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 28px; }
+  .control { background: #111827; border: 1px solid #1e293b; border-radius: 14px; padding: 16px 18px; }
+  .ctl-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+  .ctl-label { font-size: 13px; font-weight: 600; color: #cbd5e1; }
+  .ctl-val { font-size: 18px; font-weight: 800; color: #7dd3fc; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: #7dd3fc; cursor: pointer; }
+  .ctl-hint { font-size: 11.5px; color: #64748b; margin-top: 10px; }
+
+  .toggle { display: flex; align-items: center; gap: 10px; background: #1e293b; border: none;
+    border-radius: 999px; padding: 6px 14px 6px 6px; cursor: pointer; width: 100%; transition: background .2s; }
+  .toggle.on { background: #0c4a6e; }
+  .knob { width: 22px; height: 22px; border-radius: 50%; background: #64748b; transition: transform .2s, background .2s; display: block; }
+  .toggle.on .knob { background: #7dd3fc; transform: translateX(4px); }
+  .toggle-txt { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .card { background: #111827; border: 1px solid #1e293b; border-radius: 16px; padding: 20px 22px 24px; position: relative; overflow: hidden; }
+  .card.muted { opacity: 0.72; }
+  .card-tag { font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 12px; }
+  .card-sprints { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .card-sprints-u { font-size: 14px; font-weight: 600; color: #64748b; }
+  .card-big { font-size: 15px; font-weight: 700; color: #cbd5e1; letter-spacing: -0.01em; margin: 8px 0 4px; line-height: 1.15; }
+  .card-small { font-size: 12.5px; color: #94a3b8; }
+  .card-rule { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; opacity: 0.8; }
+
+  .ye-block { background: #111827; border: 1px solid #1e293b; border-radius: 16px; padding: 22px 24px; margin-bottom: 24px; }
+  .ye-title { font-size: 15px; font-weight: 700; margin-bottom: 18px; }
+  .ye-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 18px; }
+  .ye-num { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1; }
+  .ye-of { font-size: 18px; color: #475569; font-weight: 700; }
+  .ye-label { font-size: 12px; color: #94a3b8; margin-top: 8px; }
+  .ye-note { font-size: 11.5px; color: #64748b; margin-top: 18px; line-height: 1.5; border-top: 1px solid #1e293b; padding-top: 14px; }
+
+  .hist-block { background: #111827; border: 1px solid #1e293b; border-radius: 16px; padding: 22px 24px; margin-bottom: 20px; }
+  .hist-title { font-size: 15px; font-weight: 700; margin-bottom: 20px; }
+  .hist { display: flex; align-items: flex-end; gap: 4px; height: 160px; }
+  .hist-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+  .bar { width: 100%; border-radius: 3px 3px 0 0; min-height: 2px; transition: height .3s; }
+  .bar-label { font-size: 9px; color: #475569; margin-top: 6px; white-space: nowrap; transform: rotate(-45deg); transform-origin: center; height: 24px; }
+  .legend { display: flex; gap: 18px; margin-top: 20px; font-size: 12px; color: #94a3b8; }
+  .dot-wrap { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+  footer { font-size: 11.5px; color: #475569; line-height: 1.6; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">MONTE CARLO · PROGNOZA DOSTARCZANIA</div>
+  <h1>Kiedy skończymy backlog?</h1>
+  <p class="sub" id="sub"></p>
+
+  <div class="controls">
+    <div class="control">
+      <div class="ctl-top">
+        <span class="ctl-label">Nowe wymagania (scope creep)</span>
+        <span class="ctl-val" id="scopeVal">+25%</span>
+      </div>
+      <input type="range" min="0" max="35" value="25" id="scope">
+      <div class="ctl-hint" id="scopeHint"></div>
+    </div>
+
+    <div class="control">
+      <div class="ctl-top">
+        <span class="ctl-label">Sezonowe naprawy (od IX)</span>
+        <span class="ctl-val" id="repairVal">25%</span>
+      </div>
+      <input type="range" min="0" max="50" value="25" id="repair">
+      <div class="ctl-hint" id="repairHint"></div>
+    </div>
+
+    <div class="control">
+      <div class="ctl-top">
+        <span class="ctl-label">Dane GUS o zwolnieniach</span>
+      </div>
+      <button class="toggle" id="gusToggle" aria-pressed="false">
+        <span class="knob"></span>
+        <span class="toggle-txt" id="gusTxt">Wyłączone</span>
+      </button>
+      <div class="ctl-hint">Skaluje moc wg chorobowości vs. baza IV–VII</div>
+    </div>
+  </div>
+
+  <div class="grid" id="cards"></div>
+
+  <div class="ye-block">
+    <div class="ye-title">Ile zdążymy do końca 2026?</div>
+    <div class="ye-row" id="yeRow"></div>
+    <div class="ye-note">
+      Święta: 50% zespołu urlopuje w tygodniu przed Bożym Narodzeniem, 100% między
+      świętami a Trzech Króli (6.01), 50% w tygodniu po. Ten spadek mocy jest wliczony.
+    </div>
+  </div>
+
+  <div class="hist-block">
+    <div class="hist-title">Rozkład daty ukończenia całego backlogu</div>
+    <div class="hist" id="hist"></div>
+    <div class="legend">
+      <span class="dot-wrap"><span class="dot" style="background:#7dd3fc"></span> 85%</span>
+      <span class="dot-wrap"><span class="dot" style="background:#c4b5fd"></span> 95%</span>
+      <span class="dot-wrap"><span class="dot" style="background:#334155"></span> pozostałe</span>
+    </div>
+  </div>
+
+  <footer id="footer"></footer>
+</div>
+
+<script>
+// ── Fixed inputs ─────────────────────────────────────────────
+const BACKLOG = 62;
+const THROUGHPUT = [5, 4, 4, 5, 6, 4, 2, 3, 2, 5, 6];
+const SPRINT_DAYS = 14;
+const START = new Date("2026-09-01");
+const YEAR_END = new Date("2026-12-31");
+const RUNS = 10000;
+
+const GUS = { 0:10.0,1:9.7,2:9.8,3:8.2,4:7.6,5:7.4,6:6.8,7:6.7,8:7.8,9:9.2,10:8.6,11:8.2 };
+const GUS_BASE = (GUS[3]+GUS[4]+GUS[5]+GUS[6])/4;
+
+function holidayFactor(sprintStart, sprintEnd) {
+  let sum = 0, n = 0;
+  const d = new Date(sprintStart);
+  while (d < sprintEnd) {
+    const m = d.getMonth(), day = d.getDate();
+    let avail = 1;
+    if (m === 11) { if (day>=18 && day<=24) avail=0.5; else if (day>=25) avail=0; }
+    else if (m === 0) { if (day<=6) avail=0; else if (day<=13) avail=0.5; }
+    sum += avail; n++;
+    d.setDate(day + 1);
+  }
+  return n ? sum/n : 1;
+}
+function pick(a){ return a[(Math.random()*a.length)|0]; }
+function percentile(s,p){ return s[Math.min(s.length-1, Math.floor((p/100)*s.length))]; }
+function fractionBefore(start,end,cut){ if(cut<=start)return 0; if(cut>=end)return 1; return (cut-start)/(end-start); }
+function fmtDate(d){ return d.toLocaleDateString("pl-PL",{day:"numeric",month:"long",year:"numeric"}); }
+function fmtShort(d){ return d.toLocaleDateString("pl-PL",{month:"short",day:"numeric"}); }
+function sprintsToDate(s){ const d=new Date(START); d.setDate(START.getDate()+s*SPRINT_DAYS); return d; }
+
+function runSimulation(scopeAdd, repairPct, gusOn) {
+  const finishSprints = [], doneByYearEnd = [];
+  const repairMult = 1 - repairPct/100;
+  const target = BACKLOG + Math.round(BACKLOG * scopeAdd/100);
+
+  for (let r=0; r<RUNS; r++) {
+    let done=0, sprint=0, doneAtYearEnd=null;
+    while (done<target && sprint<200) {
+      const sStart = new Date(START); sStart.setDate(START.getDate()+sprint*SPRINT_DAYS);
+      const sEnd = new Date(sStart); sEnd.setDate(sStart.getDate()+SPRINT_DAYS);
+      let capacity = pick(THROUGHPUT) * repairMult;
+      capacity *= holidayFactor(sStart, sEnd);
+      if (gusOn) capacity *= GUS_BASE / GUS[sStart.getMonth()];
+      const delivered = Math.max(0, Math.round(capacity));
+      done += delivered;
+      if (doneAtYearEnd===null && sEnd>YEAR_END) {
+        doneAtYearEnd = Math.min(done - delivered + Math.max(0, Math.round(
+          delivered * fractionBefore(sStart, sEnd, YEAR_END))), target);
+      }
+      sprint++;
+    }
+    if (doneAtYearEnd===null) doneAtYearEnd = Math.min(done, target);
+    finishSprints.push(sprint);
+    doneByYearEnd.push(Math.min(doneAtYearEnd, target));
+  }
+  finishSprints.sort((a,b)=>a-b);
+  doneByYearEnd.sort((a,b)=>a-b);
+  return { finishSprints, doneByYearEnd, target };
+}
+
+// ── State + render ───────────────────────────────────────────
+let scopeAdd = 25, repairPct = 25, gusOn = false;
+
+function render() {
+  const sim = runSimulation(scopeAdd, repairPct, gusOn);
+  const p85 = percentile(sim.finishSprints,85), p95 = percentile(sim.finishSprints,95), p50 = percentile(sim.finishSprints,50);
+  const ye85 = percentile(sim.doneByYearEnd,15), ye95 = percentile(sim.doneByYearEnd,5), ye50 = percentile(sim.doneByYearEnd,50);
+
+  document.getElementById("sub").textContent =
+    `${RUNS.toLocaleString("pl-PL")} symulacji · start ${fmtDate(START)} · bazowa przepustowość z danych IV–VII 2026 (${THROUGHPUT.join(", ")} elem./sprint)`;
+  document.getElementById("scopeVal").textContent = "+"+scopeAdd+"%";
+  document.getElementById("scopeHint").textContent = `Powiększa zakres do ${sim.target} elementów`;
+  document.getElementById("repairVal").textContent = repairPct+"%";
+  document.getElementById("repairHint").textContent = `Zabiera ${repairPct}% mocy przerobowej`;
+
+  document.getElementById("cards").innerHTML = [
+    card("#7dd3fc","85% pewności", fmtDate(sprintsToDate(p85)), "cały zakres ukończony", false, p85),
+    card("#c4b5fd","95% pewności", fmtDate(sprintsToDate(p95)), "konserwatywna data", false, p95),
+    card("#6b7280","50% (mediana)", fmtDate(sprintsToDate(p50)), "rzut monetą", true, p50),
+  ].join("");
+
+  document.getElementById("yeRow").innerHTML = [
+    yeStat(ye95,"z 95% pewnością co najmniej","#c4b5fd",sim.target,false),
+    yeStat(ye85,"z 85% pewnością co najmniej","#7dd3fc",sim.target,false),
+    yeStat(ye50,"mediana (50%)","#94a3b8",sim.target,true),
+  ].join("");
+
+  // histogram
+  const counts = {};
+  sim.finishSprints.forEach(s => counts[s]=(counts[s]||0)+1);
+  const keys = Object.keys(counts).map(Number).sort((a,b)=>a-b);
+  const max = Math.max(...keys.map(k=>counts[k]));
+  document.getElementById("hist").innerHTML = keys.map(k=>{
+    const h = counts[k]/max*100;
+    const col = k===p95 ? "#c4b5fd" : k===p85 ? "#7dd3fc" : "#334155";
+    return `<div class="hist-col"><div class="bar" style="height:${h}%;background:${col}" title="${k} sprintów: ${counts[k]} symulacji"></div><div class="bar-label">${fmtShort(sprintsToDate(k))}</div></div>`;
+  }).join("");
+
+  document.getElementById("footer").textContent =
+    `Model: losowanie historycznej przepustowości na sprint, korygowane o naprawy sezonowe, urlopy świąteczne (XII/I)${gusOn?" oraz chorobowość GUS":""} i przyrost zakresu. Dane wejściowe zebrane w oknie kwiecień–lipiec 2026.`;
+}
+
+function card(accent, tag, big, small, muted, sprints) {
+  return `<div class="card${muted?' muted':''}">
+    <div class="card-tag" style="color:${accent}">${tag}</div>
+    <div class="card-sprints" style="color:${accent}">${sprints} <span class="card-sprints-u">sprintów</span></div>
+    <div class="card-big">${big}</div>
+    <div class="card-small">${small}</div>
+    <div class="card-rule" style="background:${accent}"></div></div>`;
+}
+function yeStat(n, label, accent, target, muted) {
+  return `<div><div class="ye-num" style="color:${muted?'#94a3b8':accent}">${n}<span class="ye-of">/${target}</span></div>
+    <div class="ye-label">${label}</div></div>`;
+}
+
+document.getElementById("scope").addEventListener("input", e => { scopeAdd=+e.target.value; render(); });
+document.getElementById("repair").addEventListener("input", e => { repairPct=+e.target.value; render(); });
+document.getElementById("gusToggle").addEventListener("click", () => {
+  gusOn = !gusOn;
+  const t = document.getElementById("gusToggle");
+  t.classList.toggle("on", gusOn);
+  t.setAttribute("aria-pressed", gusOn);
+  document.getElementById("gusTxt").textContent = gusOn ? "Uwzględniane" : "Wyłączone";
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
