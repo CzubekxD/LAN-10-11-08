@@ -72,6 +72,14 @@
 <div class="wrap">
   <div class="controls">
     <div class="ctl-group">
+      <span>Granulacja</span>
+      <div class="seg" id="granSeg">
+        <button data-g="day" class="active">Dni</button>
+        <button data-g="week">Tygodnie</button>
+        <button data-g="month">Miesiące</button>
+      </div>
+    </div>
+    <div class="ctl-group">
       <span>Okno czasowe</span>
       <div class="seg" id="rangeSeg">
         <button data-r="all" class="active">Wszystko</button>
@@ -114,9 +122,10 @@
   </div>
 
   <div class="card">
-    <div class="chart-title">Wykres X — wartość przepustowości <small>(linia centralna = średnia; UNPL/LNPL = średnia ± 2,66 × średni ruchomy rozstęp; LNPL przycięte do 0)</small></div>
+    <div class="chart-title" id="xTitle">Wykres X — wartość przepustowości <small>(linia centralna = średnia; UNPL/LNPL = średnia ± 2,66 × średni ruchomy rozstęp; LNPL przycięte do 0)</small></div>
     <div id="xchart"></div>
     <div class="legend" id="xlegend"></div>
+    <div class="excluded-note" id="granNote"></div>
     <div class="excluded-note" id="exclHint"></div>
   </div>
 
@@ -245,10 +254,43 @@ const RAW = [
 ];
 RAW.forEach(r=>r.date=new Date(r.d+"T00:00:00"));
 const excluded = new Set();
-let state = {range:"all", dow:"all", s1:false, s2:false, sig:true};
+let state = {range:"all", dow:"all", gran:"day", s1:false, s2:false, sig:true};
 
 const SVGNS="http://www.w3.org/2000/svg";
 function el(tag,attrs){const e=document.createElementNS(SVGNS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);return e;}
+
+// ISO week number
+function isoWeek(dt){
+  const d=new Date(Date.UTC(dt.getFullYear(),dt.getMonth(),dt.getDate()));
+  const day=d.getUTCDay()||7; d.setUTCDate(d.getUTCDate()+4-day);
+  const ys=new Date(Date.UTC(d.getUTCFullYear(),0,1));
+  const wk=Math.ceil(((d-ys)/86400000+1)/7);
+  return {y:d.getUTCFullYear(),w:wk};
+}
+function aggregate(days,gran){
+  if(gran==="day") return days.map(r=>({...r}));
+  const groups={};
+  days.forEach(r=>{
+    let key,label;
+    if(gran==="week"){const {y,w}=isoWeek(r.date);key=y+"-W"+String(w).padStart(2,"0");label="T"+w;}
+    else {key=r.date.getFullYear()+"-"+String(r.date.getMonth()+1).padStart(2,"0");
+      label=r.date.toLocaleDateString("pl-PL",{month:"short"});}
+    (groups[key]=groups[key]||{key,label,v:0,cnt:0,dates:[]});
+    groups[key].v+=r.v; groups[key].cnt++; groups[key].dates.push(r.date);
+  });
+  const out=Object.values(groups).sort((a,b)=>a.dates[0]-b.dates[0]);
+  // oznacz niepełne skrajne okresy
+  const expected = gran==="week"?7:null;
+  out.forEach((g,i)=>{
+    g.d=g.key; g.date=g.dates[0]; g.end=g.dates[g.dates.length-1];
+    let incomplete=false;
+    if(gran==="week"){ incomplete = g.cnt<7; }
+    else { const dim=new Date(g.date.getFullYear(),g.date.getMonth()+1,0).getDate();
+      incomplete = g.date.getDate()>1 || g.end.getDate()<dim; }
+    g.incomplete=incomplete;
+  });
+  return out;
+}
 
 function activeData(){
   let d = RAW.slice();
@@ -258,7 +300,7 @@ function activeData(){
     const cut = new Date(maxD); cut.setMonth(cut.getMonth()-parseInt(state.range));
     d = d.filter(r=>r.date>=cut);
   }
-  return d;
+  return aggregate(d, state.gran);
 }
 function computeStats(data){
   const kept = data.filter((r,i)=>!excluded.has(r.d));
@@ -357,8 +399,13 @@ function drawX(data,st,sig){
   svg.appendChild(el("path",{d:path,fill:"none",stroke:"var(--accent)","stroke-width":1.6,opacity:.85}));
   // x labels (sparse)
   const step=Math.ceil(n/8);
+  const xlab=r=>{
+    if(state.gran==="day") return r.date.toLocaleDateString("pl-PL",{day:"2-digit",month:"short"});
+    if(state.gran==="week") return (r.label||"T")+"\u00A0"+r.date.toLocaleDateString("pl-PL",{day:"2-digit",month:"2-digit"});
+    return r.date.toLocaleDateString("pl-PL",{month:"short",year:"2-digit"});
+  };
   data.forEach((r,i)=>{if(i%step===0||i===n-1){const t=el("text",{x:x(i),y:H-14,fill:"var(--ink-dim)","font-size":10,"text-anchor":"middle"});
-    t.textContent=r.date.toLocaleDateString("pl-PL",{day:"2-digit",month:"short"});svg.appendChild(t);}});
+    t.textContent=xlab(r);svg.appendChild(t);}});
   // points
   data.forEach((r,i)=>{
     const ex=excluded.has(r.d);
@@ -375,9 +422,21 @@ function drawX(data,st,sig){
     } else {
       node=el("circle",{cx,cy,r:4,fill:"var(--accent)",stroke:"#0e1116","stroke-width":1});
     }
+    // znacznik niepełnego okresu (tygodnie/miesiące na krańcach)
+    if(r.incomplete && !ex){
+      svg.appendChild(el("circle",{cx,cy,r:8,fill:"none",stroke:"var(--sig2)","stroke-width":1.3,"stroke-dasharray":"2 2",opacity:.9}));
+    }
     node.setAttribute("class","dot-hover");
+    const tipHead = state.gran==="day"
+      ? r.date.toLocaleDateString("pl-PL",{day:"2-digit",month:"long",year:"numeric"})
+      : state.gran==="week"
+        ? "Tydzień "+(r.label||"")+" ("+r.date.toLocaleDateString("pl-PL",{day:"2-digit",month:"2-digit"})+"–"+(r.end?r.end.toLocaleDateString("pl-PL",{day:"2-digit",month:"2-digit"}):"")+")"
+        : r.date.toLocaleDateString("pl-PL",{month:"long",year:"numeric"});
+    const valLabel = state.gran==="day" ? "Przepustowość" : "Suma przepustowości";
     node.addEventListener("mousemove",e=>showTip(e,
-      `<b>${r.date.toLocaleDateString("pl-PL",{day:"2-digit",month:"long",year:"numeric"})}</b><br>Przepustowość: ${r.v}`+
+      `<b>${tipHead}</b><br>${valLabel}: ${r.v}`+
+      (r.cnt?`<br><span style='color:#9aa7b4'>${r.cnt} dni w okresie</span>`:"")+
+      (r.incomplete?`<br><span style='color:var(--sig2)'>okres niepełny</span>`:"")+
       (s&&!ex?`<br>Sygnał: ${sigLabel(s.lab)}`:"")+(ex?"<br><i>wykluczony z obliczeń</i>":"")+"<br><span style='color:#9aa7b4'>klik = wyklucz/przywróć</span>"));
     node.addEventListener("mouseleave",hideTip);
     node.addEventListener("click",()=>{ if(excluded.has(r.d))excluded.delete(r.d);else excluded.add(r.d); render();});
@@ -457,10 +516,30 @@ function render(){
   drawX(data,st,sig);
   drawMR(data,st);
   renderStats(st);renderLegend();
+  // tytuł + adnotacja zależne od granulacji
+  const gName={day:"wartość dzienna",week:"suma tygodniowa (ISO)",month:"suma miesięczna"}[state.gran];
+  document.getElementById("xTitle").innerHTML=
+    `Wykres X — ${gName} <small>(linia centralna = średnia ${state.gran==="day"?"wartości":"sum"} okresów; UNPL/LNPL = średnia ± 2,66 × MR̄; LNPL przycięte do 0)</small>`;
+  const nIncomplete=data.filter(r=>r.incomplete).length;
+  const gn=document.getElementById("granNote");
+  gn.textContent = nIncomplete>0
+    ? `⚠ ${nIncomplete} okres(y) niepełne (obrys przerywany) — pierwszy/ostatni ${state.gran==="week"?"tydzień":"miesiąc"} nie obejmuje pełnego zakresu, więc ich suma jest naturalnie niższa; pozostawione w obliczeniach zgodnie z ustawieniem.`
+    : "";
   document.getElementById("exclCount").textContent=excluded.size+" punktów wykluczonych";
 }
 
 // controls
+document.getElementById("granSeg").addEventListener("click",e=>{
+  if(e.target.tagName!=="BUTTON")return;
+  [...e.currentTarget.children].forEach(b=>b.classList.remove("active"));
+  e.target.classList.add("active");state.gran=e.target.dataset.g;
+  // "dni robocze" ma sens tylko dla granulacji dziennej
+  const dowSeg=document.getElementById("dowSeg");
+  if(state.gran!=="day"){ state.dow="all";
+    [...dowSeg.children].forEach(b=>b.classList.toggle("active",b.dataset.w==="all"));
+    dowSeg.style.opacity=.4; dowSeg.style.pointerEvents="none";
+  } else { dowSeg.style.opacity=1; dowSeg.style.pointerEvents="auto"; }
+  render();});
 document.getElementById("rangeSeg").addEventListener("click",e=>{
   if(e.target.tagName!=="BUTTON")return;
   [...e.currentTarget.children].forEach(b=>b.classList.remove("active"));
