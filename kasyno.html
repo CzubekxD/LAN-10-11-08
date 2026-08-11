@@ -169,9 +169,10 @@
       <div class="hist" id="hist"></div>
     </div>
     <div class="legend">
-      <span class="dot-wrap"><span class="dot" style="background:#7dd3fc"></span> 0–85% (najbardziej prawdopodobne)</span>
-      <span class="dot-wrap"><span class="dot" style="background:#c4b5fd"></span> 85–95% (bufor)</span>
-      <span class="dot-wrap"><span class="dot" style="background:#334155"></span> 95–100% (ogon)</span>
+      <span class="dot-wrap"><span class="dot" style="background:#ef4444"></span> &lt;50% (ryzyko)</span>
+      <span class="dot-wrap"><span class="dot" style="background:#eab308"></span> 50–85%</span>
+      <span class="dot-wrap"><span class="dot" style="background:#84cc16"></span> 85–95%</span>
+      <span class="dot-wrap"><span class="dot" style="background:#15803d"></span> &gt;95% (bezpiecznie)</span>
     </div>
   </div>
 
@@ -378,28 +379,31 @@ function render() {
   const keys = Object.keys(counts).map(Number).sort((a,b)=>a-b);
   const max = Math.max(...keys.map(k=>counts[k]));
   const n = keys.length;
-  // fractional x-position (0..1) of the p85/p95 boundaries across the bar row
-  const idx85 = keys.findIndex(k => k > p85);
-  const idx95 = keys.findIndex(k => k > p95);
-  const b85 = (idx85 === -1 ? n : idx85) / n * 100;
-  const b95 = (idx95 === -1 ? n : idx95) / n * 100;
-  // gradient background: three confidence zones fading left→right
+  // fractional x-positions (%) of the p50/p85/p95 boundaries across the bar row
+  const boundary = (p) => { const i = keys.findIndex(k => k > p); return (i === -1 ? n : i) / n * 100; };
+  const b50 = boundary(p50), b85 = boundary(p85), b95 = boundary(p95);
+  // four confidence zones: <50 red, 50–85 yellow, 85–95 light green, >95 dark green
+  const RED = "239,68,68", YEL = "234,179,8", LGRN = "132,204,22", DGRN = "21,128,61";
   document.getElementById("histZones").style.background =
     `linear-gradient(90deg,
-      rgba(125,211,252,0.28) 0%,
-      rgba(125,211,252,0.18) ${b85}%,
-      rgba(196,181,253,0.20) ${b85}%,
-      rgba(196,181,253,0.10) ${b95}%,
-      rgba(51,65,85,0.15) ${b95}%,
-      rgba(51,65,85,0.05) 100%)`;
+      rgba(${RED},0.30) 0%,
+      rgba(${RED},0.18) ${b50}%,
+      rgba(${YEL},0.28) ${b50}%,
+      rgba(${YEL},0.16) ${b85}%,
+      rgba(${LGRN},0.30) ${b85}%,
+      rgba(${LGRN},0.18) ${b95}%,
+      rgba(${DGRN},0.35) ${b95}%,
+      rgba(${DGRN},0.20) 100%)`;
   document.getElementById("histZones").innerHTML =
-    `<div class="zone-tick" style="left:${b85}%"><span>85%</span></div>
+    `<div class="zone-tick" style="left:${b50}%"><span>50%</span></div>
+     <div class="zone-tick" style="left:${b85}%"><span>85%</span></div>
      <div class="zone-tick" style="left:${b95}%"><span>95%</span></div>`;
   document.getElementById("hist").innerHTML = keys.map(k=>{
     const h = counts[k]/max*100;
-    let col = "#334155";              // domyślnie szary
-    if (k === p85) col = "#7dd3fc";   // słupek na progu 85% — niebieski
-    else if (k === p95) col = "#c4b5fd"; // słupek na progu 95% — fioletowy
+    let col = "#334155";                    // domyślnie szary
+    if (k === p50) col = "#eab308";         // próg 50% — żółty (start strefy 50–85)
+    else if (k === p85) col = "#84cc16";    // próg 85% — jasnozielony
+    else if (k === p95) col = "#15803d";    // próg 95% — ciemnozielony
     return `<div class="hist-col"><div class="bar" style="height:${h}%;background:${col}" title="${k} sprintów"></div><div class="bar-label">${fmtShort(sprintsToDate(k))}</div></div>`;
   }).join("");
 
