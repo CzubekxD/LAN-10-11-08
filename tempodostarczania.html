@@ -81,6 +81,13 @@
       </div>
     </div>
     <div class="ctl-group">
+      <span>Zbiór dni</span>
+      <div class="seg" id="dowSeg">
+        <button data-w="all" class="active">Wszystkie dni</button>
+        <button data-w="wd">Tylko robocze</button>
+      </div>
+    </div>
+    <div class="ctl-group">
       <span>Strefy sigma (z MR)</span>
       <div class="toggles">
         <label class="toggle"><input type="checkbox" id="t1s"> ±1σ</label>
@@ -98,6 +105,13 @@
   </div>
 
   <div class="stats" id="stats"></div>
+
+  <div class="signals-box" style="margin-top:-6px;">
+    <h3>Porównanie: wpływ weekendów na granice</h3>
+    <div class="sig-row">Wszystkie 103 dni (weekendy = 0): średnia <b>1,97</b> · UNPL <b>9,69</b> · MR̄ <b>2,90</b></div>
+    <div class="sig-row">Tylko 74 dni robocze: średnia <b>2,74</b> · UNPL <b>11,52</b> · MR̄ <b>3,30</b></div>
+    <p class="note">Wszystkie 29 weekendów ma wartość 0 — to dni bez pracy, nie „zerowa przepustowość". Wliczanie ich zaniża średnią i sztucznie podbija zmienność (ruchomy rozstęp skacze przez wymuszone zera). Przełącznik „Zbiór dni" powyżej pozwala liczyć XmR tylko z dni roboczych. Widać też wzorzec tygodniowy: pon–śr nisko, czw–pt szczyt.</p>
+  </div>
 
   <div class="card">
     <div class="chart-title">Wykres X — wartość przepustowości <small>(linia centralna = średnia; UNPL/LNPL = średnia ± 2,66 × średni ruchomy rozstęp; LNPL przycięte do 0)</small></div>
@@ -231,15 +245,16 @@ const RAW = [
 ];
 RAW.forEach(r=>r.date=new Date(r.d+"T00:00:00"));
 const excluded = new Set();
-let state = {range:"all", s1:false, s2:false, sig:true};
+let state = {range:"all", dow:"all", s1:false, s2:false, sig:true};
 
 const SVGNS="http://www.w3.org/2000/svg";
 function el(tag,attrs){const e=document.createElementNS(SVGNS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);return e;}
 
 function activeData(){
   let d = RAW.slice();
+  if(state.dow==="wd"){ d = d.filter(r=>{const g=r.date.getDay(); return g!==0&&g!==6;}); }
   if(state.range!=="all"){
-    const maxD = RAW[RAW.length-1].date;
+    const maxD = d.length? d[d.length-1].date : RAW[RAW.length-1].date;
     const cut = new Date(maxD); cut.setMonth(cut.getMonth()-parseInt(state.range));
     d = d.filter(r=>r.date>=cut);
   }
@@ -450,6 +465,10 @@ document.getElementById("rangeSeg").addEventListener("click",e=>{
   if(e.target.tagName!=="BUTTON")return;
   [...e.currentTarget.children].forEach(b=>b.classList.remove("active"));
   e.target.classList.add("active");state.range=e.target.dataset.r;render();});
+document.getElementById("dowSeg").addEventListener("click",e=>{
+  if(e.target.tagName!=="BUTTON")return;
+  [...e.currentTarget.children].forEach(b=>b.classList.remove("active"));
+  e.target.classList.add("active");state.dow=e.target.dataset.w;render();});
 document.getElementById("t1s").addEventListener("change",e=>{state.s1=e.target.checked;render();});
 document.getElementById("t2s").addEventListener("change",e=>{state.s2=e.target.checked;render();});
 document.getElementById("tSig").addEventListener("change",e=>{state.sig=e.target.checked;render();});
