@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monte Carlo — prognoza dostarczenia Epików</title>
+<style>
+  :root{
+    --bg:#faf9f5; --surface:#ffffff; --surface-alt:#f3f1ea;
+    --text:#1a1a18; --text-sec:#5f5e5a; --text-muted:#888780;
+    --border:#e2e0d7; --border-strong:#c9c6bb;
+    --accent:#185fa5; --accent-bg:#e6f1fb;
+    --success:#0f6e56; --warning:#854f0b; --danger:#a32d2d;
+    --radius:8px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#1f1e1c; --surface:#2a2825; --surface-alt:#33302c;
+      --text:#f0eee8; --text-sec:#b4b2a9; --text-muted:#888780;
+      --border:#3d3a35; --border-strong:#4a4740;
+      --accent:#85b7eb; --accent-bg:#0c447c;
+      --success:#5dcaa5; --warning:#ef9f27; --danger:#f09595;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.6; padding:2rem 1rem;
+  }
+  .wrap{max-width:920px; margin:0 auto;}
+  h1{font-size:24px; font-weight:500; margin:0 0 4px;}
+  .sub{color:var(--text-sec); font-size:15px; margin:0 0 2rem;}
+  h2{font-size:18px; font-weight:500; margin:2rem 0 1rem;}
+  .stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:1.5rem;}
+  .card{background:var(--surface-alt); border-radius:var(--radius); padding:1rem;}
+  .card .lbl{font-size:13px; color:var(--text-sec); margin-bottom:4px;}
+  .card .val{font-size:24px; font-weight:500;}
+  .card .hint{font-size:12px; color:var(--text-muted);}
+  .chartbox{margin:1.5rem 0; position:relative; height:280px; background:var(--surface); border:0.5px solid var(--border); border-radius:12px; padding:12px;}
+  .controls{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:1.25rem 1.5rem; margin-bottom:1rem;}
+  .ctrl label{font-size:14px; color:var(--text-sec);}
+  .ctrl .row{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;}
+  .ctrl .out{font-size:14px; font-weight:500;}
+  .ctrl .desc{font-size:12px; color:var(--text-muted); margin-top:4px;}
+  input[type=range]{width:100%; accent-color:var(--accent);}
+  input[type=number],input[type=text],select{
+    width:100%; height:34px; padding:4px 8px; font-size:14px;
+    background:var(--surface); color:var(--text);
+    border:0.5px solid var(--border-strong); border-radius:var(--radius);
+  }
+  table{width:100%; border-collapse:collapse; font-size:14px;}
+  th{text-align:left; color:var(--text-sec); font-weight:400; padding:8px 10px;}
+  td{padding:6px 10px; border-top:0.5px solid var(--border);}
+  button{
+    font-size:14px; padding:7px 14px; cursor:pointer;
+    background:var(--surface); color:var(--text);
+    border:0.5px solid var(--border-strong); border-radius:var(--radius);
+  }
+  button:hover{background:var(--surface-alt);}
+  button.icon{width:34px; height:34px; padding:0; display:inline-flex; align-items:center; justify-content:center;}
+  .thead{display:flex; justify-content:space-between; align-items:center;}
+  .tablewrap{overflow-x:auto;}
+  .foot{font-size:12px; color:var(--text-muted); margin-top:8px;}
+  .runbtn{background:var(--accent); color:#fff; border:none; font-weight:500; padding:9px 18px;}
+  input[type=date]{width:100%; height:34px; padding:4px 8px; font-size:14px; background:var(--surface); color:var(--text); border:0.5px solid var(--border-strong); border-radius:var(--radius);}
+  .probbar{display:flex; height:44px; border-radius:var(--radius); overflow:hidden; margin:1.5rem 0; border:0.5px solid var(--border);}
+  .probbar .seg{display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:500; color:#fff; transition:flex-basis .25s; white-space:nowrap; overflow:hidden;}
+  .probbar .done{background:var(--success);}
+  .probbar .miss{background:var(--danger);}
+  .datewrap{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem; margin-bottom:1.5rem;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Prognoza dostarczenia Epików — Monte Carlo</h1>
+  <p class="sub">6 Epików, start wrzesień 2026, cel: koniec 2026. Sekwencyjnie, 10&nbsp;000 symulacji.</p>
+
+  <div class="stats">
+    <div class="card"><div class="lbl">Prawdopodobieństwo celu</div><div class="val" id="stat-prob">–</div><div class="hint">≤ <span id="tlbl">8</span> sprintów</div></div>
+    <div class="card"><div class="lbl">Mediana (P50)</div><div class="val" id="stat-p50">–</div><div class="hint">sprintów</div></div>
+    <div class="card"><div class="lbl">Bezpieczny (P85)</div><div class="val" id="stat-p85">–</div><div class="hint">sprintów</div></div>
+    <div class="card"><div class="lbl">Data P85</div><div class="val" id="stat-date">–</div><div class="hint">koniec sprintu</div></div>
+  </div>
+
+  <div class="probbar">
+    <div class="seg done" id="seg-done" style="flex-basis:0%;"></div>
+    <div class="seg miss" id="seg-miss" style="flex-basis:0%;"></div>
+  </div>
+
+  <div class="chartbox"><canvas id="chart"></canvas></div>
+
+  <div class="controls">
+    <div class="ctrl">
+      <div class="row"><label>Długość sprintu</label><span class="out"><span id="sprint-out">10</span> dni rob.</span></div>
+      <input type="range" min="5" max="20" value="10" step="1" id="sprintlen">
+      <div class="desc">Baza = 10 dni. Skaluje velocity i przelicza kalendarz.</div>
+    </div>
+  </div>
+
+  <div class="datewrap">
+    <div class="ctrl">
+      <div class="row"><label>Data startu</label></div>
+      <input type="date" id="startdate" value="2026-09-01">
+    </div>
+    <div class="ctrl">
+      <div class="row"><label>Data celu (koniec)</label><span class="out" id="target-out">8 sprintów</span></div>
+      <input type="date" id="enddate" value="2026-12-19">
+      <div class="desc">Cel liczony automatycznie z dat i długości sprintu.</div>
+    </div>
+  </div>
+
+  <div class="ctrl" style="margin-bottom:1.5rem;">
+    <div class="row"><label>Dane historyczne velocity (historyjek/sprint)</label><span class="out" id="hist-out">średnia 4,3</span></div>
+    <input type="text" id="histdata" value="3, 4, 5, 4, 2, 7, 4, 5">
+    <div class="desc">Wartości po przecinku. Model losuje z tej puli (bootstrap). Dane już na poziomie 75% dostępności.</div>
+  </div>
+
+  <div class="thead">
+    <h2 style="margin:0;">Epiki</h2>
+    <button id="add-epic">+ Dodaj Epik</button>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr>
+        <th>Epik</th><th style="width:90px;">Min</th><th style="width:90px;">Max</th>
+        <th style="width:130px;">Mnożnik wiedzy</th><th style="width:44px;"></th>
+      </tr></thead>
+      <tbody id="epic-body"></tbody>
+    </table>
+  </div>
+  <div class="foot">Mnożnik wiedzy: baza 1,0. &lt;1 = rozumieją lepiej (mniej historyjek), &gt;1 = gorzej. Rozmiar losowany jednostajnie z [min, max], potem × mnożnik. Velocity: losowanie z danych historycznych [3, 4, 5, 4, 2, 7, 4, 5], dane już na poziomie 75% dostępności.</div>
+
+  <div class="thead" style="margin-top:2rem;">
+    <h2 style="margin:0;">Mnożniki przepustowości per miesiąc</h2>
+    <button id="add-month">+ Dodaj miesiąc</button>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr>
+        <th>Miesiąc</th><th style="width:160px;">Mnożnik przepustowości</th><th style="width:44px;"></th>
+      </tr></thead>
+      <tbody id="month-body"></tbody>
+    </table>
+  </div>
+  <div class="foot">Baza 1,0 = dane historyczne (poziom 75% dostępności). Sprint dostaje mnożnik miesiąca, w którym wypada jego data startu. &gt;1 = szybciej (np. wrzesień po urlopach, wyższa dostępność, lepsza znajomość domeny), &lt;1 = wolniej / niższa dostępność. Miesiące spoza tabeli = 1,0.</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+(function(){
+  let VELOCITY=[3,4,5,4,2,7,4,5];
+  const MONTHNAMES=["sty","lut","mar","kwi","maj","cze","lip","sie","wrz","paź","lis","gru"];
+  let months=[
+    {y:2026,m:8,mult:1.2},
+    {y:2026,m:9,mult:1.1},
+    {y:2026,m:10,mult:1.0},
+    {y:2026,m:11,mult:1.0},
+  ];
+  let epics=[
+    {name:"Epik 1",min:4,max:6,mult:1.0},
+    {name:"Epik 2",min:3,max:5,mult:1.0},
+    {name:"Epik 3",min:3,max:4,mult:1.0},
+    {name:"Epik 4",min:3,max:5,mult:1.0},
+    {name:"Epik 5",min:4,max:7,mult:1.0},
+    {name:"Epik 6",min:4,max:8,mult:1.0},
+  ];
+  const $=id=>document.getElementById(id);
+  const cv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  function parseHist(){
+    const raw=$("histdata").value.split(/[,;\s]+/).map(x=>parseFloat(x.replace(",","."))).filter(x=>!isNaN(x)&&x>=0);
+    if(raw.length){VELOCITY=raw;}
+    const mean=VELOCITY.reduce((a,b)=>a+b,0)/VELOCITY.length;
+    $("hist-out").textContent="średnia "+mean.toFixed(1).replace(".",",");
+  }
+
+  function monthMult(sprintIdx,days){
+    const d=startDate();
+    d.setDate(d.getDate()+sprintIdx*calDays(days));
+    const y=d.getFullYear(), m=d.getMonth();
+    const hit=months.find(x=>x.y===y&&x.m===m);
+    return hit?hit.mult:1.0;
+  }
+
+
+  function startDate(){const v=$("startdate").value;return v?new Date(v+"T00:00:00"):new Date(2026,8,1);}
+  function calDays(days){return Math.round(days/5*7);}
+  function sprintEnd(n,days){const d=startDate();d.setDate(d.getDate()+n*calDays(days)-1);return d;}
+  function fmt(d){const m=["sty","lut","mar","kwi","maj","cze","lip","sie","wrz","paź","lis","gru"];return d.getDate()+" "+m[d.getMonth()]+" "+d.getFullYear();}
+  function targetSprints(days){
+    const s=startDate(), ev=$("enddate").value;
+    if(!ev)return 8;
+    const e=new Date(ev+"T00:00:00");
+    const span=(e-s)/(1000*60*60*24)+1;
+    return Math.max(1,Math.floor(span/calDays(days)));
+  }
+
+  function renderTable(){
+    const b=$("epic-body");b.innerHTML="";
+    epics.forEach((e,i)=>{
+      const tr=document.createElement("tr");
+      tr.innerHTML=
+        '<td><input type="text" value="'+e.name+'" data-i="'+i+'" data-f="name"></td>'+
+        '<td><input type="number" min="0" value="'+e.min+'" data-i="'+i+'" data-f="min"></td>'+
+        '<td><input type="number" min="0" value="'+e.max+'" data-i="'+i+'" data-f="max"></td>'+
+        '<td><input type="number" min="0" step="0.05" value="'+e.mult.toFixed(2)+'" data-i="'+i+'" data-f="mult"></td>'+
+        '<td style="text-align:center;"><button class="icon" data-del="'+i+'" title="Usuń">✕</button></td>';
+      b.appendChild(tr);
+    });
+    b.querySelectorAll("input").forEach(inp=>inp.addEventListener("change",ev=>{
+      const i=+ev.target.dataset.i,f=ev.target.dataset.f;
+      epics[i][f]=f==="name"?ev.target.value:(parseFloat(ev.target.value)||0);
+      run();
+    }));
+    b.querySelectorAll("button[data-del]").forEach(bt=>bt.addEventListener("click",ev=>{
+      const i=+ev.currentTarget.dataset.del;
+      if(epics.length>1){epics.splice(i,1);renderTable();run();}
+    }));
+  }
+
+  function renderMonths(){
+    const b=$("month-body");b.innerHTML="";
+    months.forEach((mo,i)=>{
+      let opts="";
+      for(let mm=0;mm<12;mm++){
+        for(const yy of [2026,2027]){
+          const sel=(mo.y===yy&&mo.m===mm)?" selected":"";
+          opts+='<option value="'+yy+'-'+mm+'"'+sel+'>'+MONTHNAMES[mm]+" "+yy+'</option>';
+        }
+      }
+      const tr=document.createElement("tr");
+      tr.innerHTML=
+        '<td><select data-i="'+i+'" data-f="ym" style="width:100%;">'+opts+'</select></td>'+
+        '<td><input type="number" min="0" step="0.05" value="'+mo.mult.toFixed(2)+'" data-i="'+i+'" data-f="mult"></td>'+
+        '<td style="text-align:center;"><button class="icon" data-mdel="'+i+'" title="Usuń">✕</button></td>';
+      b.appendChild(tr);
+    });
+    b.querySelectorAll("select,input").forEach(el=>el.addEventListener("change",ev=>{
+      const i=+ev.target.dataset.i,f=ev.target.dataset.f;
+      if(f==="ym"){const[y,m]=ev.target.value.split("-").map(Number);months[i].y=y;months[i].m=m;}
+      else{months[i].mult=parseFloat(ev.target.value)||0;}
+      run();
+    }));
+    b.querySelectorAll("button[data-mdel]").forEach(bt=>bt.addEventListener("click",ev=>{
+      const i=+ev.currentTarget.dataset.mdel;
+      months.splice(i,1);renderMonths();run();
+    }));
+  }
+
+  let chart;
+  function draw(hist,maxS){
+    const target=targetSprints(+$("sprintlen").value);
+    const labels=[],data=[],colors=[];
+    for(let s=1;s<=maxS;s++){labels.push(s);data.push(hist[s]||0);colors.push(s<=target?cv("--accent"):cv("--border-strong"));}
+    if(chart)chart.destroy();
+    chart=new Chart($("chart").getContext("2d"),{
+      type:"bar",
+      data:{labels,datasets:[{data,backgroundColor:colors,borderRadius:3,barPercentage:0.92,categoryPercentage:0.96}]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{title:it=>"Koniec w sprincie "+it[0].label,label:it=>it.parsed.y+"% symulacji"}}},
+        scales:{
+          x:{title:{display:true,text:"Sprint zakończenia wszystkich Epików",color:cv("--text-sec")},grid:{display:false},ticks:{color:cv("--text-sec")}},
+          y:{title:{display:true,text:"% symulacji",color:cv("--text-sec")},grid:{color:cv("--border")},ticks:{color:cv("--text-sec")}}
+        }}
+    });
+  }
+
+  function run(){
+    const N=10000;
+    const days=+$("sprintlen").value;
+    const target=targetSprints(days);
+    const scale=(days/10);
+    const res=[];let maxS=1;
+    for(let it=0;it<N;it++){
+      let total=0;
+      for(const e of epics){
+        const lo=Math.min(e.min,e.max),hi=Math.max(e.min,e.max);
+        total+=(lo+Math.floor(Math.random()*(hi-lo+1)))*e.mult;
+      }
+      let rem=total,s=0;
+      while(rem>0&&s<200){let v=VELOCITY[Math.floor(Math.random()*VELOCITY.length)]*scale*monthMult(s,days);s++;rem-=v;}
+      res.push(s);if(s>maxS)maxS=s;
+    }
+    res.sort((a,b)=>a-b);maxS=Math.min(maxS,24);
+    const hist={};res.forEach(r=>{const k=Math.min(r,maxS);hist[k]=(hist[k]||0)+1;});
+    Object.keys(hist).forEach(k=>hist[k]=Math.round(hist[k]/N*1000)/10);
+    const pct=p=>res[Math.min(res.length-1,Math.floor(p*res.length))];
+    const p50=pct(0.5),p85=pct(0.85);
+    const prob=Math.round(res.filter(r=>r<=target).length/N*100);
+    $("stat-prob").textContent=prob+"%";
+    $("stat-prob").style.color=prob>=85?"var(--success)":prob>=50?"var(--warning)":"var(--danger)";
+    $("stat-p50").textContent=p50;$("stat-p85").textContent=p85;
+    $("stat-date").textContent=fmt(sprintEnd(p85,days));
+    $("tlbl").textContent=target;
+    $("target-out").textContent=target+" "+(target===1?"sprint":(target<5?"sprinty":"sprintów"));
+
+    const miss=100-prob;
+    const dSeg=$("seg-done"), mSeg=$("seg-miss");
+    dSeg.style.flexBasis=prob+"%";
+    mSeg.style.flexBasis=miss+"%";
+    dSeg.textContent = prob>=8 ? ("Ukończą: "+prob+"%") : (prob>0?prob+"%":"");
+    mSeg.textContent = miss>=8 ? ("Nie ukończą: "+miss+"%") : (miss>0?miss+"%":"");
+
+    draw(hist,maxS);
+  }
+
+  [["sprintlen","sprint-out",v=>v]].forEach(([id,out,f])=>{
+    $(id).addEventListener("input",e=>{$(out).textContent=f(e.target.value);run();});
+  });
+  $("startdate").addEventListener("change",run);
+  $("enddate").addEventListener("change",run);
+  $("histdata").addEventListener("change",()=>{parseHist();run();});
+  $("add-epic").addEventListener("click",()=>{epics.push({name:"Epik "+(epics.length+1),min:3,max:6,mult:1.0});renderTable();run();});
+  $("add-month").addEventListener("click",()=>{
+    const last=months.length?months[months.length-1]:{y:2026,m:8};
+    let nm=last.m+1,ny=last.y;if(nm>11){nm=0;ny++;}
+    months.push({y:ny,m:nm,mult:1.0});renderMonths();run();
+  });
+
+  parseHist();renderTable();renderMonths();run();
+})();
+</script>
+</body>
+</html>
