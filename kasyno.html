@@ -12,6 +12,23 @@
   h1 { font-size: 38px; font-weight: 800; margin-bottom: 8px; letter-spacing: -0.02em; line-height: 1.05; }
   .sub { font-size: 13.5px; color: #94a3b8; line-height: 1.5; margin-bottom: 28px; }
 
+  .metric-block { background: #0f1729; border: 1px solid #1e293b; border-radius: 16px; padding: 20px 24px; margin-bottom: 16px; }
+  .metric-title { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 16px; }
+  .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; align-items: start; }
+  .metric-field label { display: block; font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 10px; }
+  .metric-wide { grid-column: span 2; min-width: 260px; }
+  .metric-field input[type=text], .metric-field input[type=number] {
+    width: 100%; background: #0b0f1a; border: 1px solid #334155; border-radius: 8px;
+    color: #e2e8f0; font-size: 15px; font-weight: 600; padding: 9px 11px; font-family: inherit; }
+  .metric-field input:focus { outline: none; border-color: #7dd3fc; }
+  .metric-field .hint { font-size: 11px; color: #64748b; margin-top: 8px; }
+  .seg { display: flex; gap: 4px; background: #0b0f1a; border: 1px solid #334155; border-radius: 10px; padding: 4px; }
+  .seg button { flex: 1; background: transparent; border: none; color: #94a3b8; font-size: 12.5px; font-weight: 600;
+    padding: 8px 6px; border-radius: 7px; cursor: pointer; font-family: inherit; transition: background .15s, color .15s; }
+  .seg button.active { background: #0c4a6e; color: #7dd3fc; }
+  .metric-wide .gus-base-row, .metric-field .gus-base-row { display: flex; align-items: center; gap: 8px; }
+  .metric-field .gus-base-row input { width: 70px; color: #f0abfc; text-align: right; }
+  .metric-field .gus-base-row span { font-size: 12px; color: #94a3b8; }
   .setup { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px; }
   .field { background: #111827; border: 1px solid #1e293b; border-radius: 14px; padding: 16px 18px; }
   .field label { display: block; font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 10px; }
@@ -96,6 +113,34 @@
   <h1>Kiedy skończymy backlog?</h1>
   <p class="sub" id="sub"></p>
 
+  <div class="metric-block">
+    <div class="metric-title">Metryczka — dane wejściowe</div>
+    <div class="metric-grid">
+      <div class="metric-field">
+        <label>Jednostka sprintu</label>
+        <div class="seg" id="sprintUnit">
+          <button data-days="7">Tydzień</button>
+          <button data-days="14" class="active">2 tygodnie</button>
+          <button data-days="30">Miesiąc</button>
+        </div>
+        <div class="hint" id="sprintUnitHint">14 dni na sprint</div>
+      </div>
+      <div class="metric-field metric-wide">
+        <label for="throughputInput">Historyczne dostawy (elementów na sprint)</label>
+        <input type="text" id="throughputInput" value="5, 4, 4, 5, 6, 4, 2, 3, 2, 5, 6">
+        <div class="hint" id="throughputHint"></div>
+      </div>
+      <div class="metric-field">
+        <label for="absenceReal">Absencja realna (baza)</label>
+        <div class="gus-base-row">
+          <input type="number" id="absenceReal" value="4" min="0" max="20" step="0.5">
+          <span>% czasu / rok</span>
+        </div>
+        <div class="hint">z Twoich danych; GUS rozkłada sezonowo</div>
+      </div>
+    </div>
+  </div>
+
   <div class="setup">
     <div class="field">
       <label for="backlog">Backlog startowy</label>
@@ -113,12 +158,7 @@
         <span class="knob"></span>
         <span class="toggle-txt" id="gusTxt">Wyłączone</span>
       </button>
-      <div class="gus-base-row">
-        <span>Baza roczna:</span>
-        <input type="number" id="gusAnnual" value="4" min="0" max="20" step="0.5">
-        <span>% czasu</span>
-      </div>
-      <div class="hint">GUS rozkłada tę bazę sezonowo na miesiące</div>
+      <div class="hint">rozkłada absencję realną z metryczki na miesiące</div>
     </div>
   </div>
 
@@ -180,8 +220,8 @@
 </div>
 
 <script>
-const THROUGHPUT = [5,4,4,5,6,4,2,3,2,5,6];
-const SPRINT_DAYS = 14;
+let THROUGHPUT = [5,4,4,5,6,4,2,3,2,5,6];
+let SPRINT_DAYS = 14;
 const RUNS = 10000;
 const MONTHS_PL = ["stycznia","lutego","marca","kwietnia","maja","czerwca","lipca","sierpnia","września","października","listopada","grudnia"];
 const MONTHS_SHORT = ["sty","lut","mar","kwi","maj","cze","lip","sie","wrz","paź","lis","gru"];
@@ -361,6 +401,9 @@ function render() {
 
   document.getElementById("sub").textContent =
     `${RUNS.toLocaleString("pl-PL")} symulacji · start ${fmtDate(startDate)} · backlog ${backlog}+${totalAddedItems()} = ${sim.target} · przepustowość IV–VII 2026 (${THROUGHPUT.join(", ")})`;
+  const avg = THROUGHPUT.reduce((a,b)=>a+b,0)/THROUGHPUT.length;
+  const thEl = document.getElementById("throughputHint");
+  if (thEl) thEl.textContent = `${THROUGHPUT.length} sprintów · średnia ${avg.toFixed(1)} elem./sprint`;
 
   document.getElementById("cards").innerHTML = [
     card("#7dd3fc","85% pewności", fmtDate(sprintsToDate(p85)), "cały zakres ukończony", false, p85),
@@ -431,7 +474,22 @@ document.getElementById("backlog").addEventListener("input", e => { backlog = Ma
 document.getElementById("startDate").addEventListener("change", e => {
   const v = e.target.value; if (v) { startDate = new Date(v + "T00:00:00"); renderPlanTable(); render(); }
 });
-document.getElementById("gusAnnual").addEventListener("input", e => {
+// ── Metryczka wiring ──
+document.querySelectorAll("#sprintUnit button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#sprintUnit button").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    SPRINT_DAYS = +btn.dataset.days;
+    const labels = {7:"tydzień", 14:"2 tygodnie", 30:"miesiąc"};
+    document.getElementById("sprintUnitHint").textContent = `${SPRINT_DAYS} dni na sprint`;
+    render();
+  });
+});
+document.getElementById("throughputInput").addEventListener("input", e => {
+  const parsed = e.target.value.split(/[,;\s]+/).map(x => parseFloat(x)).filter(x => !isNaN(x) && x >= 0);
+  if (parsed.length) { THROUGHPUT = parsed; render(); }
+});
+document.getElementById("absenceReal").addEventListener("input", e => {
   gusAnnual = Math.max(0, +e.target.value || 0);
   renderPlanTable();
   render();
