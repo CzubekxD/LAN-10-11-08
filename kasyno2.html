@@ -129,7 +129,7 @@
       <tbody id="epic-body"></tbody>
     </table>
   </div>
-  <div class="foot">Mnożnik wiedzy: baza 1,0. &lt;1 = rozumieją lepiej (mniej historyjek), &gt;1 = gorzej. Rozmiar losowany jednostajnie z [min, max], potem × mnożnik. Velocity: losowanie z danych historycznych [3, 4, 5, 4, 2, 7, 4, 5], dane już na poziomie 75% dostępności.</div>
+  <div class="foot">Mnożnik wiedzy: baza 1,0. &gt;1 = rozumieją lepiej (szybciej, np. 2,0 = dwa razy szybciej), &lt;1 = gorzej (wolniej). Rozmiar losowany jednostajnie z [min, max], potem ÷ mnożnik. Velocity: losowanie z danych historycznych [3, 4, 5, 4, 2, 7, 4, 5], dane już na poziomie 75% dostępności.</div>
 
   <div class="thead" style="margin-top:2rem;">
     <h2 style="margin:0;">Mnożniki przepustowości per miesiąc</h2>
@@ -276,7 +276,7 @@
       let total=0;
       for(const e of epics){
         const lo=Math.min(e.min,e.max),hi=Math.max(e.min,e.max);
-        total+=(lo+Math.floor(Math.random()*(hi-lo+1)))*e.mult;
+        total+=(lo+Math.floor(Math.random()*(hi-lo+1)))/(e.mult||1);
       }
       let rem=total,s=0;
       while(rem>0&&s<200){let v=VELOCITY[Math.floor(Math.random()*VELOCITY.length)]*scale*monthMult(s,days);s++;rem-=v;}
