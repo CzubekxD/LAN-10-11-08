@@ -29,6 +29,9 @@
   .knob { width: 22px; height: 22px; border-radius: 50%; background: #64748b; transition: transform .2s, background .2s; display: block; }
   .toggle.on .knob { background: #7dd3fc; transform: translateX(4px); }
   .toggle-txt { font-size: 13px; font-weight: 600; }
+  .gus-base-row { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 11px; color: #94a3b8; }
+  .gus-base-row input { width: 52px; background: #0b0f1a; border: 1px solid #334155; border-radius: 6px; color: #f0abfc; font-size: 13px; font-weight: 700; padding: 4px 6px; text-align: right; font-family: inherit; }
+  .gus-base-row input:focus { outline: none; border-color: #f0abfc; }
 
   .table-block { background: #111827; border: 1px solid #1e293b; border-radius: 16px; padding: 22px 24px; margin-bottom: 24px; }
   .table-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
@@ -110,7 +113,12 @@
         <span class="knob"></span>
         <span class="toggle-txt" id="gusTxt">Wyłączone</span>
       </button>
-      <div class="hint">dolicza chorobowość per miesiąc</div>
+      <div class="gus-base-row">
+        <span>Baza roczna:</span>
+        <input type="number" id="gusAnnual" value="4" min="0" max="20" step="0.5">
+        <span>% czasu</span>
+      </div>
+      <div class="hint">GUS rozkłada tę bazę sezonowo na miesiące</div>
     </div>
   </div>
 
@@ -177,10 +185,16 @@ const RUNS = 10000;
 const MONTHS_PL = ["stycznia","lutego","marca","kwietnia","maja","czerwca","lipca","sierpnia","września","października","listopada","grudnia"];
 const MONTHS_SHORT = ["sty","lut","mar","kwi","maj","cze","lip","sie","wrz","paź","lis","gru"];
 
-// GUS sickness share by month; baseline = source data window (Apr–Jul)
-const GUS = {0:10.0,1:9.7,2:9.8,3:8.2,4:7.6,5:7.4,6:6.8,7:6.7,8:7.8,9:9.2,10:8.6,11:8.2};
-const GUS_BASE = (GUS[3]+GUS[4]+GUS[5]+GUS[6])/4;
-function gusPct(monthIdx){ return Math.max(0, Math.round((1 - GUS_BASE/GUS[monthIdx]) * 100)); }
+// GUS: udział miesiąca w rocznej sumie zwolnień (sumuje się do ~100%).
+// To NIE jest % czasu na zwolnieniu — to sezonowość. Realny odsetek absencji
+// bierzemy z bazy rocznej (gusAnnual) i rozkładamy wg tych udziałów.
+const GUS_SHARE = {0:10.0,1:9.7,2:9.8,3:8.2,4:7.6,5:7.4,6:6.8,7:6.7,8:7.8,9:9.2,10:8.6,11:8.2};
+let gusAnnual = 4.0; // % czasu pracy rocznie na zwolnieniu (średnia PL ~12 dni/rok)
+// miesięczny % absencji = baza × (udział miesiąca / średni udział miesięczny)
+function gusPct(monthIdx){
+  const avgShare = 100/12; // gdyby zwolnienia były równe co miesiąc
+  return Math.round(gusAnnual * (GUS_SHARE[monthIdx] / avgShare) * 10) / 10;
+}
 
 // ── State ──
 let backlog = 62;
@@ -412,6 +426,11 @@ function yeStat(n, label, accent, target, muted) {
 document.getElementById("backlog").addEventListener("input", e => { backlog = Math.max(1, +e.target.value||1); render(); });
 document.getElementById("startDate").addEventListener("change", e => {
   const v = e.target.value; if (v) { startDate = new Date(v + "T00:00:00"); renderPlanTable(); render(); }
+});
+document.getElementById("gusAnnual").addEventListener("input", e => {
+  gusAnnual = Math.max(0, +e.target.value || 0);
+  renderPlanTable();
+  render();
 });
 document.getElementById("gusToggle").addEventListener("click", () => {
   gusOn = !gusOn;
